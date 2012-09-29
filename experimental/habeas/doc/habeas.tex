@@ -1,6 +1,8 @@
 \documentclass[a4paper]{article}
 
+\title{Linear Logic as a Programming Language}
 \begin{document}
+\maketitle
 
 \section{Introduction}
 
@@ -53,6 +55,8 @@ by whatever proof tree(s) are there to prove the upper rule(s); then
 from the right-hand side of the upper rule(s) down to the right-hand
 side of the lower rule.
 
+In general, there are a number of values available, and a number of
+activation records are produced.
 
 \paragraph{The cast.} Linear logic contains four binary connectives (type operators) and
 one unary operator:
@@ -88,15 +92,75 @@ Each of the four binary operators have a neutral element:
   \end{tabular}
 \end{center}
 
-= The rules
+\section{Linear Logic Rules and Habeas Language Constructs}
 
-<Per-rule: the rule itself; a short description of what goes on; impact and constraints on context/variables; syntactical construct.>
+In the following we go through each of the derivation rules of linear
+logic and see, what language construct each gives rise to.
 
-== Product type.
-== Sum type.
+\subsection{Rules for $\otimes$, the Product Type}
+% If Γ,A,B,Δ⊢Θ, then Γ,A⊗B,Δ⊢Θ; conversely, if Γ⊢Δ,A and Λ⊢B,Θ, then Γ,Λ⊢Δ,A⊗B,Θ.
 
-// 'par' + negation provides a function/call mechanism.
-// 'with' + negation provides a multi-return-path mechanism.
+\subsubsection{Product introduction}
+\paragraph{Rule:}
+$$
+{
+ {\Sigma_1 \vdash A;\Delta_1}
+ \qquad
+ {\Sigma_2 \vdash B;\Delta_2}
+}\over{
+ \Sigma_1, \Sigma_2 \vdash A \otimes B ; \Delta_1 ; \Delta_2
+}
+$$
+
+\paragraph{What goes on:} Two subexpressions create values of type $A$
+and $B$, respectively. These two values are then combined into a value
+of product type $A \otimes B$.
+
+% Of the available values, some go to creating a value of type $A$ (and a set of activation records), while the rest go to creating a value of type $B$ (and another set of activation records). The two values are then combined into a value of product type $A \otimes B$ (and the union of the activation records).
+
+\paragraph{Constraints and impact:} The available values are divided
+between the two subexpressions.  Any extra activation records created
+by the two subexpressions continue to exist.
+
+\paragraph{Language construct:} Tuple creation, denoted by
+\begin{quote}\texttt
+  (tuple ($e_1$ $e_2$ $\ldots$ $e_n$))
+\end{quote}
+(Note that the language construct is $n$-ary rather than binary.)
+
+\subsubsection{Product elimination}
+\paragraph{Rule:}
+$$
+{
+  \Sigma, A, B \vdash \Delta
+}\over{
+  \Sigma, A\otimes B \vdash \Delta
+}
+$$
+
+\paragraph{What goes on:} A value of type $A \otimes B$ is split into two values of type $A$ and $B$, respectively.
+\paragraph{Constraints and impact:} The value of type $A \otimes B$ is consumed; two the new values become available; all other available values continue to exist.
+\paragraph{Language construct:} Tuple deconstruction, denoted by
+\begin{quote}\texttt
+  (untuple ($v_1$ $v_2$ $\ldots$ $v_n$) $e_{tuple}$ $e_{body}$)
+\end{quote}
+(Note that the language construct is $n$-ary rather than binary.)\\
+The variables $v_i$ are bound to the elements of the tuple, and are available in the expression $e_{body}$.
+
+
+\subsection{Rules for $\oplus$, the Sum Type}
+\subsection{Rules for $\&$, the Choice Type}
+\subsection{Rules for $|$, the Par Type}
+
+\paragraph{Rule:}
+\paragraph{What goes on:}
+\paragraph{Constraints and impact:}
+\paragraph{Language construct:}
+
+
+
+% 'par' + negation provides a function/call mechanism.
+% 'with' + negation provides a multi-return-path mechanism.
 
 
 
