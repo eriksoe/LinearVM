@@ -1,0 +1,221 @@
+\documentclass[a4paper]{report}
+
+\begin{document}
+\chapter{Introduction}
+This specification defines the ``LinearVM'' abstract machine.
+
+\section{Goals and non-goals}
+The design of LinearVM aims to\ldots
+\begin{itemize}
+\item be usable for general-purpose programming
+
+\item support the creation of abstraction which do not leak
+  wrt. concurrency and memory management issues
+
+\item support efficient implementations
+
+\item be flexible, yet small
+\end{itemize}
+
+\noindent
+The design explicitly does not aim to\ldots
+\begin{itemize}
+\item be competitive with existing VMs in terms of raw performance
+\item run any programs written in existing languages
+\item support arbitrary coding or language styles
+\end{itemize}
+
+In short, the design of LinearVM aims to be practical enough for
+real-life uses, without compromising concurrency sanity. %? ...
+
+% Scope: After compilation (no language or syntax). No implementation details, except in the form of suggestions.
+
+\section{Conceptual overview}
+Conceptually, a LinearVM system consists of
+\begin{enumerate}
+\item A file format
+\item A validator
+\item An executor
+\item A set of native functions.
+\end{enumerate}
+
+A LinearVM program consists of one or more modules.
+Each module exists in the form of the file format specified in this
+text.
+
+A virtual machine which is to run the program first loads and
+validates each module; modules loaded in this manner is then made
+available for the executor to run.  If a module file fails validation,
+the virtual machine will refuse to load it.
+
+\subsection{Code entities}
+
+\paragraph{Names.}
+Some code entities are named.  Entity names are arbitrary unicode
+strings (refered to as \emph{symbols}).
+
+\paragraph{Namespaces.}
+Each named code entity belongs to a \emph{namespace}.  Namespaces are
+hierachical; they are named by a sequence of symbols separated by
+periods.
+
+(The namespaces \texttt{linearvm} and \texttt{linearvm.basis} are reserved for LinearVM-defined entities.)
+
+\paragraph{Functions.}
+A central kind of code entity is the \emph{function}.
+A function has a \emph{type signature} which describes the nature of its inputs and outputs, and a \emph{body} which consists of a piece of executable code in the form of a sequence of instructions.
+
+\paragraph{Types.}
+The type system is central to the way LinearVM works; in particular, it is central to code validation.
+Types may be named.
+
+\section{Imports and exports}
+A named code entity may be either \emph{local} to the module, or \emph{exported} for use by other modules.
+Code entitites which may be exported are: types and functions.
+
+\section{Flexibility and non-commitment}
+The design of LinearVM follows the design philosophy of ``mechanism, not policy''. Many things are left open by this spec, such as the set of available numeric types. Even basic operations such as addition fall outside the scope of the core LinearVM spec. Instead of specifying such types and functions, LinearVM provides mechanisms for defining them.
+
+% Defers decisions
+
+
+
+\chapter{Program Executor}
+
+The program executor of a LinearVM system is the core of the abstract machine.
+It is register-based and function-based, and has a quite small instruction set.
+
+
+\section{Architecture}
+\begin{figure}[h]
+  \centering
+  %\begin{minipage}{10em}
+  \begin{tabular}{rl}
+    Instruction pointer &
+  \begin{tabular}{|c|}
+    \hline
+    $IP$\\
+    \hline
+  \end{tabular}\\[0.5em]
+
+    Registers &
+  \begin{tabular}{|c|c|c|c|}
+    \hline
+    $r_1$ & $r_2$ & $\cdots\cdots$ & $r_n$ \\
+    \hline
+  \end{tabular}\\[0.5em]
+
+    Return addresses &
+  \begin{tabular}{|c|c|c|c|}
+    \hline
+    $c_1$ & $c_2$ & $\cdots$ & $c_m$ \\
+    \hline
+  \end{tabular}
+  \end{tabular}
+  %\end{minipage}
+
+  \caption{Architecture of LinearVM machine}
+\end{figure}
+
+\section{Instruction set}
+
+The machine's instruction set consists of the following instructions:
+
+\begin{description}
+\item[Load] -- load a constant into a register.
+\item[Return] -- return from the current function.
+\item[Call] -- call a function.
+\item[Label] -- marks a point in the instruction stream.
+\end{description}
+
+
+
+
+
+\chapter{File format}
+
+\section{File encoding}
+
+
+
+\section{File sections}
+
+
+
+\chapter{Type System}
+
+\section{Type kinds}
+
+\subsection{Imported types}
+Types imported from other modules. These are opaque types from the
+importing module's point of view.
+$$ \mathit{import(name, arity)} $$
+
+\subsection{Product types (records)}
+$$ \mathit{product((symbol_1, type_1), \ldots, (symbol_n, type_n))} $$
+$$ t_1 \otimes t_2 \otimes \ldots \otimes t_n $$
+
+%% Re. operations: mention export trick (exported field ref splitter returns record of access rights to each relevant field; with suitable (guaranteed?) representation optimations, this virtual record gives no overhead.)
+
+\subsection{Sum types (variants)}
+$$ \mathit{sum((symbol_1, type_1), \ldots, (symbol_n, type_n))} $$
+$$ t_1 \oplus t_2 \oplus \ldots \oplus t_n $$
+
+\subsection{Vtable types}
+$$ \mathit{vtable(parent, sig_1, \ldots, sig_n)} $$
+$$ sig_1! \otimes sig_2! \otimes \ldots \otimes sig_n! $$
+%% TODO: Where to put the '!' ? Prefix or suffix?
+
+\subsection{Type variables}
+Type variables are encoded using de Bruijn indices.
+$$ \mathit{var(i)} $$
+
+\subsection{Type application}
+$$ \mathit{apply(type_{abs},type_{arg})} $$
+
+\subsection{Existential types}
+$$ \mathit{\exists(type)} $$
+
+\subsection{Recursive types (letrec)}
+$$ \mathit{letrec(type_1, \ldots, type_n)} $$
+
+\subsection{Symbolic types (tags)}
+
+\paragraph{References} are a special kind of symbolic tag
+named \texttt{linearvm.basis.ref}.
+
+
+\subsection{Special types}
+
+\paragraph{Never} (aka bottom) -- signifies ``can't return'' and is
+recognized and treated specially by the validator.
+Is equivalent to the empty variant.
+
+\paragraph{Void} (aka unit) -- the type containing exactly one value.
+Is equivalent to the empty record.
+
+\section{Type rules}
+
+\section{Type-specific operations}
+% Auto-rules ("axiom schemas") for product/sum/vtable/... types.
+
+
+
+\chapter{Misc}
+
+\section{Suggested representation optimizations}
+
+\paragraph{Records (product types).}
+\begin{itemize}
+\item Record fields of a virtual type (size 0) are not represented at all.
+\item Records consisting solely of fields of a virtual type are not represented at all.
+\end{itemize}
+
+\paragraph{Variants (sum types).}
+\begin{itemize}
+\item Variant types of which no variants are data bearing (i.e., pure enumerations) are represented as just the variant number.
+\item Variant types of which exactly one variant is data bearing (of type T), and which have at most 256 other variants, are represented as either a pointer to type T, or as an integer in $[0;255]$.
+\item Variant types of which at most 4 variants are data bearing (of type $T_0\ldots T_3$), and which have at most 256 other variants, are represented as either a pointer to type T, tagged in the lowest two bits with $i$, or as an integer in $[0;255]$.
+\end{itemize}
+
+\end{document}
