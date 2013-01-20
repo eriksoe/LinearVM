@@ -1,0 +1,84 @@
+%%% "Hello, World" program
+%%% {numeric_program,
+%%%  Symbols, Names,
+%%%  TypeImports,  TypeDefs,
+%%%  FunSigs,
+%%%  FunImports, FunDecls, FunExports,
+%%%  ConstantSource, ConstantDecoders, ConstantTable,
+%%%  FunCode
+%%% }
+{numeric_program,
+  %% Symbols
+  ["basis",		%#1
+   "int",		%#2
+   "bytestring",	%#3
+   "demo",		%#4
+   "string",		%#5
+   "ascii_to_string",	%#6
+   "copy",		%#7
+   "main",		%#8
+   "stdio",		%#9
+   "print",		%#10
+   "instream",		%#11
+   "outstream"		%#12
+   ],
+  %% Names
+  [{0,1},	%#1 .basis
+   {1,2},	%#2 .basis.int
+   {1,3},	%#3 .basis.bytestring
+   {0,4},	%#4 .demo
+   {4,5},	%#5 .demo.string
+   {4,6},	%#6 .demo.ascii_to_string
+   {4,7},	%#7 .demo.copy
+   {4,9},	%#8 .demo.stdio
+   {9,10},	%#9 .demo.stdio.print
+   {9,11},	%#10 .demo.stdio.instream,
+   {9,12},	%#11 .demo.stdio.outstream,
+   {0,8}	%#12 .main
+  ],
+  %% TypeImports
+  [{2,0},	%#1 basis.int (arity 0)
+   {3,0},	%#2 basis.bytestring (0)
+   {5,0},	%#3 demo.string (0)
+   {10,0},	%#4 demo.stdio.instream (0)
+   {11,0}	%#5 demo.stdio.outstream (0)
+  ],
+  %% TypeDefs
+  {5,[]},
+  %% FunSigs
+  [{[2],[],[[5],[]]},	%#1 (bytestring).() -> string | ()
+   {[5],[],[[5]]},	%#2 (string).() -> string
+   {[4,5],[],[[]]},	%#3 (instream,outstream).() -> ()
+   {[5,3],[],[[]]}	%#4 (outstream,string).() -> ()
+  ],
+  %% FunImports
+  [{6,1},	%#1 demo.ascii_to_string : (bytestring).() -> string | ()
+   {7,1},	%#2 demo.copy            : (string).() -> string
+   {9,4}	%#3 print : (outstream,string).() -> ()
+  ],
+  %% FunDecls
+  {3, [
+     {12,3,1}	%#4 main : (instream,outstream).() -> () @ 1
+   ]},
+  %% FunExports
+  [4	%# main
+  ],
+  %% Constant source
+  <<"Hello, World!\n">>,
+  %% Constant decoders
+  [{0,1,2}],	%#1 string (variable-length)
+  %% Constant table
+  [{1,14}	%#1 "Hello, World!\n"
+  ],
+  %% FunCode
+  [ % #1:
+    {0,
+     [% (in, out)
+      {c,1, 3},
+      % (in, out, s)
+      {f,3,[2,3],[],[[]]},
+      % (in, out)
+      {r,1,[]}
+     ]}
+  ]
+}.
