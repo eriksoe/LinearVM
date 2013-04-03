@@ -1,0 +1,163 @@
+\documentclass[a4paper]{report}
+
+\newcommand\arity{{\ensuremath\textit{arity}}}
+\newcommand\fixedsize{{\ensuremath\textit{fixed\_size}}}
+
+% Type constructors:
+\newcommand\tyImport{{\ensuremath\textit{import}}}
+\newcommand\tyVar{{\ensuremath\textit{var}}}
+\newcommand\tyApp{{\ensuremath\textit{app}}}
+\newcommand\tyBless{{\ensuremath\textit{bless}}}
+\newcommand\tyCurse{{\ensuremath\textit{curse}}}
+\newcommand\tyPtr{{\ensuremath\textit{ptr}}}
+
+\begin{document}
+
+\chapter{Type system}
+\label{chap:typesystem}
+
+\section{Type properties}
+
+The type rules make use of certain type properties associated with each type.
+These properties are described briefly here and defined formally later,
+as we encounter the type constructors.
+
+\subsection{Arity}
+Higher-order types are supported. To each type is therefore associated
+an \emph{arity} property which tells the depth of its free variables.
+$$
+\arity(T) : int
+$$
+Type variables are not named, but specified by their de Bruijn indices.
+
+\subsection{Assignability}
+Central to the type rules are the restrictions of value movements,
+which are governed by \emph{assignability}:
+$$
+T_{\it destination} := T_{\it sourceff}
+$$
+
+Assignability is reflexive:
+$$T := T$$c
+
+\subsection{Fixed-size}
+While polymorphic types are supported, the representation size of values
+which may inhabit registers must always be known at runtime (and
+determinable at load time).
+The type property \emph{fixed\_size} tells whether this is the case.
+$$
+\fixedsize(T)
+$$
+
+\section{Type constructors}
+
+\subsection{Imported types}
+A type occurring in a module (compilation unit) can be imported from
+outside the module.
+At the import point, an arity and \emph{view type} must be specified for it.
+The same is true of the point of export.
+$$
+\it type ::= \tyImport(name : qsymbol, arity : int, view\_type : type\_or\_opaque)
+$$
+At load time, it is verified that
+\begin{itemize}
+\item the arities match: $\arity_{\it export} = \arity_{\it import}$
+\item the view types match:\\
+$view\_type_{\it export} = view\_type_{\it import} \;\lor\; view\_type_{\it import} = opaque$
+% TODO: This might be generalized. These special cases are safe.
+\end{itemize}
+
+\subsubsection*{Properties}
+$$\arity(\tyImport(n, a, t)) = a$$
+
+$$
+{t \neq opaque
+\over
+\tyImport(n,a,t) := t}
+\quad
+{t \neq opaque
+\over
+t := \tyImport(n,a,t)}
+$$
+
+$$
+{a=0 \over \fixedsize(\tyImport(n, a, t))}
+\quad
+{\fixedsize(t) \over \fixedsize(\tyImport(n, a, t))}
+$$
+
+
+\subsection{Type variables}
+Type variables are specified by their de Bruijn indices.
+$$
+\it type ::= \tyVar(i : int)
+$$
+
+\subsubsection*{Properties}
+$$\arity(\tyVar(i)) = i$$
+
+\subsection{Type application}
+$$
+\it type ::= \tyApp(type : type, arg : type)
+$$
+\subsubsection*{Properties}
+$$ \arity(\tyApp(t,a)) = max(\arity(t)-1, \arity(a)) $$
+
+\subsection{Recursive type application}
+\subsection{Universal quantification}
+% Universal quantification is often implicit:
+\subsection{Existential quantification}
+Existential quantification binds a type variable existentially.
+$$ \it type ::= \exists(type : type) $$
+
+\subsubsection*{Properties}
+$$ \arity(\exists(t)) = \arity(t)-1 $$
+
+$${s \textrm{ is any type}} \over \exists(t) := t(s)$$
+
+
+\subsection{Cursing}
+\emph{Cursing} is a type encapsulation/subtyping mechanism.
+It is a way of marking that a type is restricted in its use.
+$$
+\it type ::= \tyCurse(name : qsymbol, args : type\_tag\_arg^*, type : type)
+$$
+$$
+\it type\_tag\_arg ::= symbol \;|\; integer \;|\; type
+$$
+
+\subsubsection*{Properties}
+$$
+\tyCurse(n,a,t) := t
+$$
+
+\subsection{Blessing}
+\emph{Blessing} is a subtyping mechanism.
+It is a way of marking that a type can be used in an extended set of
+circumstances.
+
+$$
+\it type ::= \tyBless(name : qsymbol, args : type\_tag\_arg^*, type : type)
+$$
+
+\subsubsection*{Properties}
+$$
+t := \tyBless(n,a,t)
+$$
+
+\subsection{Pointers}
+The purpose of pointer types is to represent data structures of variable length
+in a fixed-length field.
+Pointers have no ``null''-like value. Pointer types should in practise
+always be used in association with a particular memory management
+policy.
+
+$$\it type ::= \tyPtr(type : type)$$
+
+\subsubsection*{Properties}
+$$ \arity(ptr(t)) = \arity(t)$$
+
+All pointer types are fixed-size.
+$$\fixedsize(ptr(t))$$
+
+\end{document}
