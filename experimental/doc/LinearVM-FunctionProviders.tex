@@ -1,0 +1,48 @@
+\documentclass[a4paper]{report}
+
+\begin{document}
+\chapter{Function Providers}
+Built-in functions in LinearVM are divided into different groups.
+Each of these groups are managed by a \emph{function provider}.
+
+There are function providers for some of the type constructors, for
+native (FFI) functions, and for certain other special purposes.
+
+% Function providers help during verification and load time - when a function is imported from the domain of a FP, the name and signature of that function is checked by the FP; if it does indeed provide a function with that name and signature, it... does so provide.
+
+\section{Records}
+% Creation
+% Destruction
+% Querying
+% - borrowing
+% Modification
+% Partial/incremental creation and destruction
+% Fork-join access?
+
+\section{Unions}
+% Creation
+% Destruction
+% Case, test-tag
+
+\section{Vtables}
+% Invocation
+% Destruction (nop)
+
+\section{Arrays}
+% Arrays exist in two flavours: a) prefix initialized, b) all slots initialized.
+% Arrays are paired with a) a length.
+% Prefix-arrays are also paired with an initialization count.
+%
+% Creation
+% Destruction
+% Index validation
+% Read, write - checked and unchecked (with validated index)
+
+\section{Mutexes}
+\section{Heaps}
+
+
+
+
+
+\end{document}
