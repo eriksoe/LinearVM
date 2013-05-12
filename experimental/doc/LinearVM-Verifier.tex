@@ -1,0 +1,116 @@
+\documentclass[a4paper]{report}
+\usepackage{amsmath}
+
+\newcommand\arity{{\ensuremath\textit{arity}}}
+\newcommand\fixedsize{{\ensuremath\textit{fixed\_size}}}
+
+% Type constructors:
+\newcommand\tyImport{{\ensuremath\textit{import}}}
+\newcommand\tyVar{{\ensuremath\textit{var}}}
+\newcommand\tyApp{{\ensuremath\textit{app}}}
+\newcommand\tyBless{{\ensuremath\textit{bless}}}
+\newcommand\tyCurse{{\ensuremath\textit{curse}}}
+\newcommand\tyPtr{{\ensuremath\textit{ptr}}}
+
+\begin{document}
+
+\chapter{Verification algorithm}
+\label{chap:verifier}
+
+Integrity of a LinearVM instance is dependent on the well-formedness
+of the code it loads.
+An important part of well-formedness is type consistency.
+At load time, the code files to be loaded are subject to \emph{code
+  verification}, which is a series of checks that certain properties are fulfilled.
+
+\section{Checks}
+
+\begin{description}
+\item[Syntactic conformance]
+  The file must conform to the format described [in the ``File Format'' chapter].
+\item[Index validity]
+  All indices into sections must be valid.
+  This includes IDs of:
+  \begin{itemize}
+  \item Simple symbols
+  \item Qualified symbols
+  \item Types
+  \end{itemize}
+
+  It also includes byte-offset pointers into:
+  \begin{itemize}
+  \item Symbol name source
+  \end{itemize}
+\item[Back-pointing index validity]
+  Certain indices pointing from one section into that same code
+  section are constrained such that the refered-to item must occur
+  prior to (i.e., have a lower index than) the refering item.
+
+  This includes:
+  \begin{itemize}
+  \item The ``parent'' element of a qualified-symbol (if non-null).
+  \item Any type refered to in a type definition.
+  \end{itemize}
+\item[Liveness consistency of functions]
+  Each function must be liveness consistent, as described [below].
+\item[Type consistency of functions]
+  Each function must be type consistent, as described [below].
+\end{description}
+
+\section{Liveness consistency}
+At any point during the execution of a function, any register of the
+function is in one of three states:
+\begin{itemize}
+\item Dead, i.e. not containing a value;
+\item Live w/ reference, i.e. containing a reference;
+\item Live w/ value, i.e. containing a value.
+\end{itemize}
+
+\emph{Liveness consistency} is a property of a function, stating that
+regardless of the control flow path taken through the function,
+\begin{itemize}
+\item No register is read from if it is dead;
+\item No register is written to if it is live w/ value;
+\item When the function returns, no register is live w/ value.
+\end{itemize}
+
+%%% Lattice:
+%%%        Top
+%%%       /   \
+%%%    Dead    \
+%%%      |      \
+%%%  Live-ref  Live-value
+%%%       \      /
+%%%        Bottom
+
+\subsection{Lattice}
+The join function for liveness state is defined as follows:
+\begin{equation*}
+join(L_1, L_2) =
+\begin{cases}
+  L_1 & \text{if } L_1 = L_2,\\
+  dead & \text{if } \{L_1,L_2\} = \{dead, live-ref\},\\
+  top & \text{otherwise}.
+\end{cases}
+\end{equation*}
+
+\subsection{Boundary conditions}
+At the beginning of the function, any register corresponding to a
+value-parameter is live w/ value; any register corresponding to a
+reference-parameter is live w/ reference; and any other register is
+dead.
+
+\subsection{Forward flow analysis}
+The instructions are handled as follows:
+\begin{description}
+\item[Label] 
+\end{description}
+
+
+
+\section{Type consistency}
+
+\subsection{Register-set types}
+%Type
+
+\end{document}
