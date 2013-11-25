@@ -1,0 +1,24 @@
+module(hello, demo::hello).
+
+% :- op(900, xfy, '=>').
+% :- op(100, yfx, '::').
+% :- op(200, fx, '&').
+typedef(t1, t=>t).
+typedef(pair, (ta => tb => {a:ta, b:tb})).
+
+import_type(basis::int/0).
+import_type(basis::bytestring/0, bytestring).
+import_type(demo::string/0, string).
+import_type(demo::stdio::instream/0, instream).
+import_type(demo::stdio::outstream/0, outstream).
+
+import_function(demo::ascii_to_string : [&bytestring] => string // []).
+import_function(demo::copy : [&string] => string).
+import_function(demo::stdio::print : [&outstream, &string] => []).
+
+def_const_type(string, demo::ascii_to_string, demo::copy).
+
+function(main : [in: &instream, out: &outstream] => [],
+  [constant(string, "Hello, World!\n", r1),
+   call(demo::stdio::print, [out,r1], []),
+   return([])]).
