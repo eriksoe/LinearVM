@@ -12,13 +12,13 @@ import_type(demo::string/0, string).
 import_type(demo::stdio::instream/0, instream).
 import_type(demo::stdio::outstream/0, outstream).
 
-import_function(demo::ascii_to_string : [&bytestring] => string // []).
-import_function(demo::copy : [&string] => string).
-import_function(demo::stdio::print : [&outstream, &string] => []).
+import_function(demo::ascii_to_string : [&bytestring] -> string ~> []).
+import_function(demo::copy : [&string] -> string).
+import_function(demo::stdio::print : [&outstream, &string] -> []).
 
 def_const_type(string, demo::ascii_to_string, demo::copy).
 
-function(main : [in: &instream, out: &outstream] => [],
+function(main : [in: &instream, out: &outstream] -> [],
   [constant(string, "Hello, World!\n", r1),
    call(demo::stdio::print, [out,r1], []),
    return([])]).
