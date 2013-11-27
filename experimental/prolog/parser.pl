@@ -65,8 +65,9 @@ typecheck_item(def_const_type(CTName,InitFunName,CopyFunName), Env,
 typecheck_item(function(FName : ('->'(Inputs,Outputs)), Body), Env,
                [FName:function(('->'(Inputs,Outputs)), Body)|Env]) :-
     check_formal_arg_list(Inputs, Env, Locals),
-    check_function_body(Body, Locals, Env),
-    Env2 = Env. % TODO
+    check_return_type_list(Outputs, Env, Returns),
+    %% TODO: Defer function body checking till all signatures have been collected.
+    check_function_body(Body, Locals, Returns, Env).
 
 %%%==== def_const_type helpers:
 is_const_init_signature('->'(['&'(bytestring)], '~>'(T, [])), T) :- !.
@@ -81,8 +82,22 @@ check_formal_arg_list([V:T | VTs], Env, [V:T | RestLocals]) :-
     unused_name_or_fail(V, RestLocals),
     valid_arg_type(T, Env).
 
-check_function_body(Body, Locals, Env) :-
-    true. %TODO
+check_return_type_list(Outputs, Env, Returns) :-
+    check_return_type_list(Outputs, Env, 0, Returns).
+
+check_return_type_list('~>'(RT, RTs), Env, Nr, [Nr:RT|Returns]) :-
+    !,
+    valid_type_exp_list(RT, Env),
+    Nr1 is Nr+1,
+    check_return_type_list(RTs, Env, Nr1, Returns).
+check_return_type_list(RT, Env, Nr, [Nr:RT]) :-
+    valid_type_exp_list(RT, Env).
+
+
+check_function_body(Body, Locals, Returns, Env) :-
+    format("DB| Returns=~p\n", [Returns]),
+    true. %check_function_body(Body, Locals, Env). %TODO
+
 
 %%%==== Type syntax helpers:
 valid_signature('->'(Args, Result), Env) :-
