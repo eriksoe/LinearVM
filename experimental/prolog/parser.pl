@@ -57,16 +57,22 @@ desugar_declaration(import_function(FName : FSig, Alias),
                     import_function(FName : DFSig, Alias)) :-
     !, desugar_signature(FSig, DFSig).
 %% Default:
+desugar_declaration(function(FName : FSig, Body),
+                    function(FName : DFSig, Body)) :-
+    !, desugar_signature(FSig, DFSig).
 desugar_declaration(X,X). % TODO: Handle more.
 
 desugar_signature('->'(Ins,Outs), '->'(DIns,DOuts)) :-
     desugar_type_list(Ins, DIns),
     desugar_returns_list(Outs, DOuts).
 
-desugar_returns_list('~>'(Ts,Rs), [DTs|DRs]) :-
+desugar_returns_list([], [[]]) :- !.
+desugar_returns_list(Rs, DRs) :- desugar_returns_list2(Rs, DRs).
+
+desugar_returns_list2('~>'(Ts,Rs), [DTs|DRs]) :-
     !, desugar_type_list(Ts, DTs),
-    desugar_returns_list(Rs, DRs).
-desugar_returns_list(Ts, [DTs]) :-
+    desugar_returns_list2(Rs, DRs).
+desugar_returns_list2(Ts, [DTs]) :-
     !, desugar_type_list(Ts, DTs).
 
 desugar_type_list(Ts, DTs) :- list(Ts), !, map_all(desugar_type, Ts, DTs).
