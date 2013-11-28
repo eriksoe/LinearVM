@@ -5,7 +5,9 @@
 main :-
     parse(user_input, Prg),
     format("Got module: ~p\n", [Prg]),
-    typecheck(Prg),
+    desugar_program(Prg, DPrg),
+    format("Desugared module: ~p\n", [DPrg]),
+    typecheck(DPrg),
     format("Program is OK.\n", []).
 
 %%%==================== Reading / parsing ====================
@@ -29,6 +31,25 @@ set_precedences :-
     op(200, fx, '&'),
     true.
 
+%%%==================== Desugaring ====================
+%%% Desugars the following:
+%%% - Import aliases: optional -> mandatory
+%%% - Function signatures:
+%%%   - ins/outs: optional list wrapping -> mandatory
+%%%   - '~>' to lists.
+%%% - Types:
+%%%   - '{...}' to struct(Fields)
+
+desugar_program(Prg, Prg2) :-
+    map_all(desugar_declaration, Prg, Prg2).
+
+%% Aliases:
+desugar_declaration(import_type(TName/Arity),
+                    import_type(TName/Arity, TName)) :- !.
+desugar_declaration(import_function(FName : FType),
+                    import_function(FName : FType, FName)) :- !.
+desugar_declaration(X,X). % TODO: Handle more.
+
 %%%==================== Type checking ====================
 typecheck(Prg) :- typecheck(Prg, []).
 
@@ -40,13 +61,9 @@ typecheck([H|T], Env) :-
 typecheck_item(module(_,_), E, E).
 typecheck_item(typedef(TName,TExp), Env, [TName:_TypeDef|Env]) :-
     unused_name_or_fail(TName, Env), valid_type_exp(TExp, Env).
-typecheck_item(import_type(TName/Arity), Env, Env2) :-
-    typecheck_item(import_type(TName/Arity, TName), Env, Env2).
 typecheck_item(import_type(TName/Arity, Alias), Env,
                [Alias:type(imported(Arity)) | Env]) :-
     unused_name_or_fail(Alias, Env).
-typecheck_item(import_function(FName : FType), Env, Env2) :-
-    typecheck_item(import_function(FName : FType, FName), Env, Env2).
 typecheck_item(import_function(FName : FType, Alias), Env,
                [Alias:function(FType, imported)|Env]) :-
     unused_name_or_fail(Alias, Env),
@@ -146,8 +163,8 @@ lookup(Name, [_|Rest], V) :- lookup(Name, Rest, V).
 commasep_to_list(','(H,CST), [H|LT]) :- !, commasep_to_list(CST,LT).
 commasep_to_list(X, [X]).
 
-%map_all(_F, [], []).
-%map_all(F, [H|T], [RH|RT]) :- call(F, H, RH), map_all(F, T, RT).
+map_all(_F, [], []).
+map_all(F, [H|T], [RH|RT]) :- call(F, H, RH), map_all(F, T, RT).
 
 %all_are(_F, []).
 %all_are(F, [H|T]) :- call(F,H), all_are(F,T).
