@@ -5,7 +5,8 @@
 main :-
     parse(user_input, Prg),
     format("Got module: ~p\n", [Prg]),
-    desugar_program(Prg, DPrg),
+    (desugar_program(Prg, DPrg);
+     throw(desugaring_failed(Prg))),
     format("Desugared module: ~p\n", [DPrg]),
     typecheck(DPrg),
     format("Program is OK.\n", []).
@@ -44,11 +45,23 @@ desugar_program(Prg, Prg2) :-
     map_all(desugar_declaration, Prg, Prg2).
 
 %% Aliases:
+desugar_declaration(typedef(TName, Type),
+                    typedef(TName, DType)) :-
+    !, desugar_type(Type,DType).
 desugar_declaration(import_type(TName/Arity),
                     import_type(TName/Arity, TName)) :- !.
 desugar_declaration(import_function(FName : FType),
                     import_function(FName : FType, FName)) :- !.
 desugar_declaration(X,X). % TODO: Handle more.
+
+desugar_type('{}', struct([])) :- !.
+desugar_type('{}'(FieldsCS), struct(Fields)) :-
+    !, commasep_to_list(FieldsCS, Fields).
+desugar_type('=>'(TV,TExp), '=>'(TV,DTExp)) :- !, desugar_type(TExp, DTExp).
+desugar_type(T,T).
+
+commasep_to_list(','(H,CST), [H|LT]) :- !, commasep_to_list(CST,LT).
+commasep_to_list(X, [X]).
 
 %%%==================== Type checking ====================
 typecheck(Prg) :- typecheck(Prg, []).
@@ -133,10 +146,7 @@ valid_type_exp_list(L, Env).% :- all_are(valid_type_exp, L, Env).
 
 valid_type_exp('=>'(TV,TExp), Env) :- valid_type_exp(TExp, [TV:type(typevar)|Env]).
 valid_type_exp(TV, Env) :- atom(TV), lookup(TV, Env, type(_)), !.
-valid_type_exp('{}', _Env).
-valid_type_exp('{}'(FieldsCS), Env) :-
-    commasep_to_list(FieldsCS, Fields),
-    valid_fields(Fields, Env, []), !.
+valid_type_exp(struct(Fields), Env) :- valid_fields(Fields, Env, []), !.
 valid_type_exp(TExp, Env) :-
     format("Not valid_type_exp: ~p in ~p\n", [TExp, Env]), fail.
 
@@ -159,9 +169,6 @@ unused_name(Name, [K:_|Rest]) :- Name \== K, unused_name(Name, Rest).
 
 lookup(Name, [K:V|_], V) :- Name == K, !.
 lookup(Name, [_|Rest], V) :- lookup(Name, Rest, V).
-
-commasep_to_list(','(H,CST), [H|LT]) :- !, commasep_to_list(CST,LT).
-commasep_to_list(X, [X]).
 
 map_all(_F, [], []).
 map_all(F, [H|T], [RH|RT]) :- call(F, H, RH), map_all(F, T, RT).
