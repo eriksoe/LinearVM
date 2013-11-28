@@ -5,7 +5,7 @@
 main :-
     parse(user_input, Prg),
     format("Got module: ~p\n", [Prg]),
-    (desugar_program(Prg, DPrg);
+    (desugar_program(Prg, DPrg) -> !;
      throw(desugaring_failed(Prg))),
     format("Desugared module: ~p\n", [DPrg]),
     typecheck(DPrg),
@@ -18,7 +18,7 @@ parse(Stream, Prg) :-
 
 read_module(Stream, Prg) :-
     read(Stream, X), !,
-    (X==end_of_file -> Prg=[];
+    (X==end_of_file -> !, Prg=[];
      format("got: ~p\n", [X]),
      %write_canonical(X), nl,
      Prg=[X|RestPrg], read_module(Stream, RestPrg)).
@@ -45,19 +45,38 @@ desugar_program(Prg, Prg2) :-
     map_all(desugar_declaration, Prg, Prg2).
 
 %% Aliases:
+desugar_declaration(import_type(TName/Arity), R) :-
+    !, desugar_declaration(import_type(TName/Arity, TName), R).
+desugar_declaration(import_function(FName : FSig), R) :-
+    !, desugar_declaration(import_function(FName : FSig, FName), R).
+%% Types:
 desugar_declaration(typedef(TName, Type),
                     typedef(TName, DType)) :-
     !, desugar_type(Type,DType).
-desugar_declaration(import_type(TName/Arity),
-                    import_type(TName/Arity, TName)) :- !.
-desugar_declaration(import_function(FName : FType),
-                    import_function(FName : FType, FName)) :- !.
+desugar_declaration(import_function(FName : FSig, Alias),
+                    import_function(FName : DFSig, Alias)) :-
+    !, desugar_signature(FSig, DFSig).
+%% Default:
 desugar_declaration(X,X). % TODO: Handle more.
+
+desugar_signature('->'(Ins,Outs), '->'(DIns,DOuts)) :-
+    desugar_type_list(Ins, DIns),
+    desugar_returns_list(Outs, DOuts).
+
+desugar_returns_list('~>'(Ts,Rs), [DTs|DRs]) :-
+    !, desugar_type_list(Ts, DTs),
+    desugar_returns_list(Rs, DRs).
+desugar_returns_list(Ts, [DTs]) :-
+    !, desugar_type_list(Ts, DTs).
+
+desugar_type_list(Ts, DTs) :- list(Ts), !, map_all(desugar_type, Ts, DTs).
+desugar_type_list(T, DTs) :- desugar_type_list([T], DTs). % Auto-wrap case.
 
 desugar_type('{}', struct([])) :- !.
 desugar_type('{}'(FieldsCS), struct(Fields)) :-
     !, commasep_to_list(FieldsCS, Fields).
 desugar_type('=>'(TV,TExp), '=>'(TV,DTExp)) :- !, desugar_type(TExp, DTExp).
+desugar_type('&'(TExp), '&'(DTExp)) :- !, desugar_type(TExp, DTExp).
 desugar_type(T,T).
 
 commasep_to_list(','(H,CST), [H|LT]) :- !, commasep_to_list(CST,LT).
@@ -68,7 +87,7 @@ typecheck(Prg) :- typecheck(Prg, []).
 
 typecheck([], _Env).
 typecheck([H|T], Env) :-
-    (typecheck_item(H, Env, Env2) -> typecheck(T, Env2);
+    (typecheck_item(H, Env, Env2) -> !, typecheck(T, Env2);
      throw(item_did_not_typecheck(H, Env))).
 
 typecheck_item(module(_,_), E, E).
@@ -90,7 +109,7 @@ typecheck_item(def_const_type(CTName,InitFunName,CopyFunName), Env,
      throw(bad_def_const_type(CTName, undefined_function(CopyFunName, Env)))),
 
     (is_const_init_signature(InitFunType, TPrepared),
-     is_const_copy_signature(CopyFunType, TPrepared, TConst);
+     is_const_copy_signature(CopyFunType, TPrepared, TConst) -> !;
      throw(bad_def_const_type(CTName, bad_function_signatures(InitFunType,CopyFunType)))).
 typecheck_item(function(FName : ('->'(Inputs,Outputs)), Body), Env,
                [FName:function(('->'(Inputs,Outputs)), Body)|Env]) :-
@@ -100,10 +119,10 @@ typecheck_item(function(FName : ('->'(Inputs,Outputs)), Body), Env,
     check_function_body(Body, Locals, Returns, Env).
 
 %%%==== def_const_type helpers:
-is_const_init_signature('->'(['&'(bytestring)], '~>'(T, [])), T) :- !.
-is_const_init_signature('->'(['&'(bytestring)], T), T) :- !.
+is_const_init_signature('->'(['&'(bytestring)], [[T], []]), T) :- !.
+is_const_init_signature('->'(['&'(bytestring)], [[T]]), T) :- !.
 
-is_const_copy_signature('->'(['&'(T)], _), T, TConst).
+is_const_copy_signature('->'(['&'(T)], [[TConst]]), T, TConst).
 
 %%%==== function helpers:
 check_formal_arg_list([], _Env, []).
@@ -131,18 +150,16 @@ check_function_body(Body, Locals, Returns, Env) :-
 
 %%%==== Type syntax helpers:
 valid_signature('->'(Args, Result), Env) :-
-    valid_type_exp_list(Args, Env),
+    valid_type_exp_withrefs_list(Args, Env),
     valid_return_type(Result, Env).
 
-valid_return_type('~>'(T1,T2), Env) :-
-    !, valid_type_exp(T1, Env), valid_return_type(T2, Env).
-valid_return_type(TL, Env) :- list(TL), !, valid_type_exp_list(TL, Env).
-valid_return_type(T, Env) :- valid_type_exp(T, Env).
-valid_return_type(T, Env) :-
-    (valid_type_exp(T, Env) -> !;
-     throw(invalid_return_type(T))).
+valid_return_type(Tss, Env) :- all_are_1(valid_type_exp_withrefs_list, Tss, Env).
 
-valid_type_exp_list(L, Env).% :- all_are(valid_type_exp, L, Env).
+valid_type_exp_withrefs_list(L, Env) :- all_are_1(valid_type_exp_withrefs, L, Env).
+valid_type_exp_list(L, Env) :- all_are_1(valid_type_exp, L, Env).
+
+valid_type_exp_withrefs('&'(T), Env) :- !, valid_type_exp(T, Env).
+valid_type_exp_withrefs(T, Env) :- valid_type_exp(T, Env).
 
 valid_type_exp('=>'(TV,TExp), Env) :- valid_type_exp(TExp, [TV:type(typevar)|Env]).
 valid_type_exp(TV, Env) :- atom(TV), lookup(TV, Env, type(_)), !.
