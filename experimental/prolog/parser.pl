@@ -134,14 +134,12 @@ check_formal_arg_list([V:T | VTs], Env, [V:T | RestLocals]) :-
 check_return_type_list(Outputs, Env, Returns) :-
     check_return_type_list(Outputs, Env, 0, Returns).
 
-check_return_type_list('~>'(RT, RTs), Env, Nr, [Nr:RT|Returns]) :-
+check_return_type_list([], _Env, _Nr, []).
+check_return_type_list([RT|RTs], Env, Nr, [Nr:RT|Returns]) :-
     !,
     valid_type_exp_list(RT, Env),
     Nr1 is Nr+1,
     check_return_type_list(RTs, Env, Nr1, Returns).
-check_return_type_list(RT, Env, Nr, [Nr:RT]) :-
-    valid_type_exp_list(RT, Env).
-
 
 check_function_body(Body, Locals, Returns, Env) :-
     format("DB| Returns=~p\n", [Returns]),
