@@ -2,8 +2,17 @@
 
 %% Compile with: gplc parser.pl --no-top-level
 
-main :-
-    parse(user_input, Prg),
+% Reset precedences.
+:- op(1050,xfy,'->').
+
+main :- compile_from_stream(user_input).
+
+main(FileName) :-  %"../samples/hello.livm2"
+    open(FileName, read, SrcStream),
+    compile_from_stream(SrcStream).
+
+compile_from_stream(SrcStream) :-
+    parse(SrcStream, Prg),
     format("Got module: ~p\n", [Prg]),
     (desugar_program(Prg, DPrg) -> !;
      throw(desugaring_failed(Prg))),
@@ -58,9 +67,9 @@ desugar_declaration(import_function(FName : FSig, Alias),
     !, desugar_signature(FSig, DFSig).
 %% Default:
 desugar_declaration(function(FName : FSig, Body),
-                    function(FName : DFSig, Body)) :-
-    !, desugar_signature(FSig, DFSig).
-desugar_declaration(X,X). % TODO: Handle more.
+                    function(FName : DFSig, DBody)) :-
+    !, desugar_signature(FSig, DFSig), desugar_function_body(Body, DBody).
+desugar_declaration(X,X).
 
 desugar_signature('->'(Ins,Outs), '->'(DIns,DOuts)) :-
     desugar_type_list(Ins, DIns),
@@ -84,6 +93,12 @@ desugar_type('{}'(FieldsCS), struct(Fields)) :-
 desugar_type('=>'(TV,TExp), '=>'(TV,DTExp)) :- !, desugar_type(TExp, DTExp).
 desugar_type('&'(TExp), '&'(DTExp)) :- !, desugar_type(TExp, DTExp).
 desugar_type(T,T).
+
+desugar_function_body(Body, DBody) :-
+    map_all(desugar_instruction, Body, DBody).
+
+desugar_instruction(return(Vs), return(0, Vs)).
+desugar_instruction(X, X).
 
 commasep_to_list(','(H,CST), [H|LT]) :- !, commasep_to_list(CST,LT).
 commasep_to_list(X, [X]).
@@ -148,9 +163,72 @@ check_return_type_list([RT|RTs], Env, Nr, [Nr:RT|Returns]) :-
     check_return_type_list(RTs, Env, Nr1, Returns).
 
 check_function_body(Body, Locals, Returns, Env) :-
-    format("DB| Returns=~p\n", [Returns]),
-    true. %check_function_body(Body, Locals, Env). %TODO
+    Labels=[],
+    check_function_body(Body, Locals, Labels, Returns, Env).
 
+check_function_body([], _Locals, _Labels, _Returns, _Env).
+check_function_body([Insn|Insns], Locals, Labels, Returns, Env) :-
+    check_instruction(Insn,
+                      (Locals, Labels), Returns, Env,
+                      (Locals2, Labels2)),
+    check_function_body(Insns, Locals2, Labels2, Returns, Env).
+
+check_instruction(Insn,
+                  (Locals, Labels), Returns, Env,
+                  (Locals2, Labels2)) :-
+    format("DB| check_instruction: ~p\n", [Insn]),
+    ((Insn = constant(ConstTypeName, _RawData, OutReg)) ->
+         !, lookup(ConstTypeName, Env, constant_type(TConst,_,_)),
+         Locals2 = [OutReg:TConst | Locals],
+         Labels2 = Labels;
+     Insn = call(FName, Args, Outs) ->
+         !,
+         (lookup(FName, Env, function('->'(Ins,Outss), _)) -> !;
+          throw(undefined_function(FName, Env))),
+         format("DB| call: looked up: ~p\n", [(Ins, Outss)]),
+         (read_locals(Args, Ins, Locals, LocalsAfterPass) -> !;
+          throw(cannot_pass_arguments(Args, Ins, Locals))),
+         format("DB| call: passed args: ~p\n", [LocalsAfterPass]),
+         %% TODO: Handle return values
+         Locals2 = LocalsAfterPass,
+         Labels2 = Labels;
+     Insn = return(Nr, Args) ->
+         !, lookup(Nr, Returns, RetTypes),
+         read_locals(Args, RetTypes, Locals, LocalsAfterReturn),
+         (locals_contains_only_refs(LocalsAfterReturn) -> !;
+          throw(registers_are_alive_at_return(LocalsAfterReturn))),
+         (Locals2, Labels2)=(unreachable, Labels); % TODO
+     Insn = label(LabelName) ->
+         !, (Locals2, Labels2)=(Locals, Labels); % TODO
+     throw(unknown_instruction(Insn)));
+    throw(instruction_did_not_typecheck(Insn, (Locals, Returns, Env))).
+
+read_locals([], [], Locals, Locals) :- !.
+read_locals([V|Vs], ['&'(T)|Ts], Locals, Locals2) :-
+    %% Handle "T is ref type" case.
+    !,
+    (lookup(V, Locals, VType) -> !;
+     throw(cannot_read_local(V, Locals))),
+    ('&'(VType2)=VType, check_assignable(VType2, T) -> !; % "Ref-to-ref" case
+     check_assignable(VType, T) -> !;                     % "Nonref-to-ref" case
+     throw(type_mismatch(V, VType, T))),
+    read_locals(Vs, Ts, Locals, Locals2).
+read_locals([V|Vs], [T|Ts], Locals, Locals2) :-
+    !,
+    (lookup_and_remove(V, Locals, VType, LocalTmp) -> !;
+     throw(cannot_read_local(V, Locals))),
+    (check_assignable(VType, T) -> !;
+     throw(type_mismatch(V, VType, T))),
+    read_locals(Vs, Ts, LocalTmp, Locals2).
+read_locals(Vs, Ts, _Locals, _) :-
+    throw(type_number_mismatch(Vs, Ts)).
+
+locals_contains_only_refs([]).
+locals_contains_only_refs([_V:'&'(_) | VTs]) :- locals_contains_only_refs(VTs).
+
+check_assignable(T,T).
+check_assignable(FromT, ToT) :-
+    format("DB| check_assignable fails for (~p,~p)\n", [FromT, ToT]), fail.
 
 %%%==== Type syntax helpers:
 valid_signature('->'(Args, Result), Env) :-
@@ -190,6 +268,10 @@ unused_name(Name, [K:_|Rest]) :- Name \== K, unused_name(Name, Rest).
 
 lookup(Name, [K:V|_], V) :- Name == K, !.
 lookup(Name, [_|Rest], V) :- lookup(Name, Rest, V).
+
+lookup_and_remove(Name, [K:V|Rest], V, Rest) :- Name == K, !.
+lookup_and_remove(Name, [KV|Rest], V, [KV|Rest2]) :-
+    lookup_and_remove(Name, Rest, V, Rest2).
 
 map_all(_F, [], []).
 map_all(F, [H|T], [RH|RT]) :- call(F, H, RH), map_all(F, T, RT).
