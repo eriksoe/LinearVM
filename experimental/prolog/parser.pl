@@ -185,10 +185,8 @@ check_instruction(Insn,
          !,
          (lookup(FName, Env, function('->'(Ins,Outss), _)) -> !;
           throw(undefined_function(FName, Env))),
-         format("DB| call: looked up: ~p\n", [(Ins, Outss)]),
          (read_locals(Args, Ins, Locals, LocalsAfterPass) -> !;
           throw(cannot_pass_arguments(Args, Ins, Locals))),
-         format("DB| call: passed args: ~p\n", [LocalsAfterPass]),
          %% TODO: Handle return values
          Locals2 = LocalsAfterPass,
          Labels2 = Labels;
@@ -215,11 +213,11 @@ read_locals([V|Vs], ['&'(T)|Ts], Locals, Locals2) :-
     read_locals(Vs, Ts, Locals, Locals2).
 read_locals([V|Vs], [T|Ts], Locals, Locals2) :-
     !,
-    (lookup_and_remove(V, Locals, VType, LocalTmp) -> !;
+    (lookup_and_remove(V, Locals, VType, LocalsTmp) -> !;
      throw(cannot_read_local(V, Locals))),
     (check_assignable(VType, T) -> !;
      throw(type_mismatch(V, VType, T))),
-    read_locals(Vs, Ts, LocalTmp, Locals2).
+    read_locals(Vs, Ts, LocalsTmp, Locals2).
 read_locals(Vs, Ts, _Locals, _) :-
     throw(type_number_mismatch(Vs, Ts)).
 
