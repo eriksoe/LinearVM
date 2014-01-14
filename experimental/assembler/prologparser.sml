@@ -68,6 +68,17 @@ fun make_stackbased_consumer synspec : (ParserStack,CST list) T.consumer =
                                          (SUBTREE(NODE(f,[x,y])))::rest)
                 else stack
               | _ => stack;
+
+        fun handle_infix_or_postfix(operator,pos,synspec,stack) =
+            (case lookup operator synspec of
+                 SOME(INFIX_L, prio) =>
+                 (INFIX_ELEM(operator,prio))::reduce_for_priority(prio,stack)
+               | SOME(INFIX_R, prio) =>
+                 (INFIX_ELEM(operator,prio))::reduce_for_priority(prio-1,stack)
+               | _ =>                    (* Unknown or postfix *)
+                 raise T.SyntaxError(pos, "Unexpected operator: "^operator^" ; context is "^stack2str stack) (* TODO: Provide context from stack *)
+            )
+
 fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
     CTOR_COLLECTING_ARGS(tag,[])::stack
   | step((CTOR_AWAITING_ARGS(tag))::stack, othertoken) =
@@ -86,23 +97,21 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
         [SUBTREE v] => [SUBTREE v]
       | _ => raise T.SyntaxError(pos,"\".\" not expected ; context is "^stack2str stack) (* TODO: add description of open constructs *)
     )
-  | step(stack as (SUBTREE a)::_, (pos, T.OP operator)) =
-  (* Check for infix/postfix *)
-    (case lookup operator synspec of
-        SOME(INFIX_L, prio) =>
-        (INFIX_ELEM(operator,prio))::reduce_for_priority(prio,stack)
-      | SOME(INFIX_R, prio) =>
-        (INFIX_ELEM(operator,prio))::reduce_for_priority(prio+1,stack)
-      | _ =>                    (* Unknown or postfix *)
-        raise T.SyntaxError(pos, "Unexpected operator: "^operator^" ; context is "^stack2str stack) (* TODO: Provide context from stack *)
-    )
+  | step(stack as (SUBTREE _)::_, (pos, T.OP operator)) =
+    handle_infix_or_postfix(operator,pos,synspec,stack)
   | step(stack, postoken as (pos,token)) =
     case token of
         T.INT v  => (SUBTREE(INT v))::stack
       | T.WORD v => (CTOR_AWAITING_ARGS v)::stack
       | T.OP v   => (CTOR_AWAITING_ARGS v)::stack
       | T.SPECIAL v =>
-        raise T.SyntaxError(pos, "Unexpected special character: \""^Char.toString v^"\" when stack is "^stack2str stack)
+        (case v of
+             #"," =>
+             handle_infix_or_postfix(",",pos,synspec,stack)
+           | _ =>
+             raise T.SyntaxError(pos, "Unexpected special character: \""^Char.toString v^"\" when stack is "^stack2str stack)
+        )
+
 fun finalize([SUBTREE v]) = [v] (* TODO *)
   | finalize(stack) = raise T.SyntaxError((~1,~1), "Unexpected EOF: "^stack2str stack)
             (* (List.app (fn (_,t)=>  print(T.tok2s t^"...\n")) stack; stack) *)
@@ -128,13 +137,3 @@ fun parse_file synspec filename =
     end
 end;
 end;
-
-(*
-fun test() =
-    PrologStyleParser.print_stack(PrologStyleParser.parse_file [] "test2.txt")
-    handle T.SyntaxError(pos as (line,col),msg) =>
-           (print(":"^Int.toString line^":"^Int.toString col^": Syntax error: "^msg^"\n");
-            raise Tokenizer.SyntaxError(pos,msg))
-
-val _ = test()
- *)

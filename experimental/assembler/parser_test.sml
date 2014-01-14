@@ -103,13 +103,19 @@ open PrologStyleParser
 val synspec0 = []
 val synspec_arith = [("+", (INFIX_L, 500)),
                      ("-", (INFIX_L, 500)),
-                     ("*", (INFIX_L, 400))]
+                     ("*", (INFIX_L, 400)),
+                     ("::", (INFIX_R, 800))]
+
+val synspec_special = [(",", (INFIX_L, 1000))]
+
 val _ =
     suite(describe "parser" [
           should("handle single integer token",
                 fn() => assertEqual(parse_string synspec0 "123.", [INT 123])),
           should("handle single word token",
                 fn() => assertEqual(parse_string synspec0 "word.", [NODE("word",[])])),
+
+          (* Normal constructors: *)
           should("handle ctor with zero parameters",
                 fn() => assertEqual(parse_string synspec0 "word().", [NODE("word",[])])),
           should("handle ctor with one parameter",
@@ -117,23 +123,34 @@ val _ =
           should("handle ctor with multiple parameter",
                 fn() => assertEqual(parse_string synspec0 "word(x,1234).", [NODE("word",[NODE("x",[]), INT 1234])])),
 
+          (* Operators as constructors: *)
           should("handle operators as constructors",
                 fn() => assertEqual(parse_string synspec0 "+(12,34).", [NODE("+",[INT 12, INT 34])])),
           should("handle operators as constructors (even if it has an infix definition)",
                 fn() => assertEqual(parse_string synspec_arith "+(12,34).", [NODE("+",[INT 12, INT 34])])),
 
+          (* Infix operators: *)
           should("handle simple infix use",
                 fn() => assertEqual(parse_string synspec_arith "12 + 34.", [NODE("+",[INT 12, INT 34])])),
 
-          should("handle infix priorities (++)",
+          should("handle infix priorities (leftassoc: ++)",
                 fn() => assertEqual(parse_string synspec_arith "1 + 2 + 3.", [NODE("+",[NODE("+",[INT 1, INT 2]), INT 3])])),
-          should("handle infix priorities (*+)",
+          should("handle infix priorities (leftassoc: *+)",
                 fn() => assertEqual(parse_string synspec_arith "1 * 2 + 3.", [NODE("+",[NODE("*",[INT 1, INT 2]), INT 3])])),
-          should("handle infix priorities (+*)",
-                fn() => assertEqual(parse_string synspec_arith "1 + 2 * 3.", [NODE("+",[INT 1, NODE("*",[INT 2, INT 3])])]))
+          should("handle infix priorities (leftassoc: +*)",
+                fn() => assertEqual(parse_string synspec_arith "1 + 2 * 3.", [NODE("+",[INT 1, NODE("*",[INT 2, INT 3])])])),
+          should("handle infix priorities (rightassoc)",
+                fn() => assertEqual(parse_string synspec_arith "1::2::3.", [NODE("::",[INT 1, NODE("::",[INT 2, INT 3])])])),
+          should("handle infix priorities (rightassoc) with atoms",
+                fn() => assertEqual(parse_string synspec_arith "a::b::c.", [NODE("::",[NODE("a",[]), NODE("::",[NODE("b",[]), NODE("c",[])])])])),
+
+         (* Special infix constructors: *)
+          should("handle ',' as infix constructor",
+                fn() => assertEqual(parse_string synspec_special "1,2,3.", [NODE(",",[NODE(",",[INT 1, INT 2]), INT 3])]))
 
          (* TODO: Parentheses *)
          (* TODO: '{}', '[]' constructors *)
+         (* TODO: "priority-difference of 1" case *)
           ])
 
 
