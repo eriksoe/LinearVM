@@ -65,7 +65,7 @@ fun make_stackbased_consumer synspec : (ParserStack,CST list) T.consumer =
               | (SUBTREE y)::(INFIX_ELEM(f,fprio))::(SUBTREE x)::rest =>
                 if fprio<=prio  (* TODO: handle difference-of-1 case *)
                 then reduce_for_priority(prio,
-                                         (SUBTREE(NODE(f,[x,y])))::rest))
+                                         (SUBTREE(NODE(f,[x,y])))::rest)
                 else stack
               | _ => stack;
 fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
