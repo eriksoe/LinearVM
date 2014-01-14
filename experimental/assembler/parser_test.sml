@@ -101,6 +101,9 @@ val _ =
 open PrologStyleParser
 
 val synspec0 = []
+val synspec_arith = [("+", (INFIX_L, 500)),
+                     ("-", (INFIX_L, 500)),
+                     ("*", (INFIX_L, 400))]
 val _ =
     suite(describe "parser" [
           should("handle single integer token",
@@ -112,5 +115,29 @@ val _ =
           should("handle ctor with one parameter",
                 fn() => assertEqual(parse_string synspec0 "word(x).", [NODE("word",[NODE("x",[])])])),
           should("handle ctor with multiple parameter",
-                fn() => assertEqual(parse_string synspec0 "word(x,1234).", [NODE("word",[NODE("x",[]), INT 1234])]))
+                fn() => assertEqual(parse_string synspec0 "word(x,1234).", [NODE("word",[NODE("x",[]), INT 1234])])),
+
+          should("handle operators as constructors",
+                fn() => assertEqual(parse_string synspec0 "+(12,34).", [NODE("+",[INT 12, INT 34])])),
+          should("handle operators as constructors (even if it has an infix definition)",
+                fn() => assertEqual(parse_string synspec_arith "+(12,34).", [NODE("+",[INT 12, INT 34])])),
+
+          should("handle simple infix use",
+                fn() => assertEqual(parse_string synspec_arith "12 + 34.", [NODE("+",[INT 12, INT 34])])),
+
+          should("handle infix priorities (++)",
+                fn() => assertEqual(parse_string synspec_arith "1 + 2 + 3.", [NODE("+",[NODE("+",[INT 1, INT 2]), INT 3])])),
+          should("handle infix priorities (*+)",
+                fn() => assertEqual(parse_string synspec_arith "1 * 2 + 3.", [NODE("+",[NODE("*",[INT 1, INT 2]), INT 3])])),
+          should("handle infix priorities (+*)",
+                fn() => assertEqual(parse_string synspec_arith "1 + 2 * 3.", [NODE("+",[INT 1, NODE("*",[INT 2, INT 3])])]))
+
+         (* TODO: Parentheses *)
+         (* TODO: '{}', '[]' constructors *)
           ])
+
+
+    (*
+     open Tokenizer; open PrologStyleParser;
+parse_string [] "12 + 34." handle e as SyntaxError(_,s) => (print s;raise e);
+ *)
