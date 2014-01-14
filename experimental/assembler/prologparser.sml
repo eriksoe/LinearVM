@@ -1,3 +1,4 @@
+local structure T=Tokenizer in
 structure PrologStyleParser =
 struct
 datatype Fixity = PREFIX | INFIX | POSTFIX
@@ -49,8 +50,13 @@ fun make_simple_consumer synspec =
 val init : ParserStack = []
 
 
-fun make_stackbased_consumer synspec : (ParserStack,ParserStack) Tokenizer.consumer =
+fun make_stackbased_consumer synspec : (ParserStack,CST list) Tokenizer.consumer =
     let
+        fun reduce_for_priority(prio, stack) =
+            case stack of
+                (* TODO: handle prefix/postfix/infix ops *)
+                (CTOR_AWAITING_ARGS v)::rest => SUBTREE(NODE(v,[]))::rest
+              | _ => stack;
 fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, Tokenizer.SPECIAL(#"("))) =
     CTOR_COLLECTING_ARGS(tag,[])::stack
   | step((CTOR_AWAITING_ARGS(tag))::stack, othertoken) =
@@ -60,14 +66,23 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, Tokenizer.SPECIAL(#"("))) =
     CTOR_COLLECTING_ARGS(tag,v::rargs)::stack
   | step((SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack, (pos, Tokenizer.SPECIAL(#")"))) =
     SUBTREE(NODE(tag,rev(v::rargs)))::stack
+  | step((CTOR_COLLECTING_ARGS(tag,[]))::stack, (pos, Tokenizer.SPECIAL(#")"))) =
+    (* Special case: 0-ary constructor used with parentheses *)
+    SUBTREE(NODE(tag,[]))::stack
+  | step(stack, (pos, Tokenizer.OP ".")) =
+    (case reduce_for_priority(1000000,stack) of
+        [SUBTREE v] => [SUBTREE v]
+      | _ => raise T.SyntaxError(pos,"\".\" not expected") (* TODO: add description of open constructs *)
+    )
   | step(stack, postoken as (pos,token)) =
     case token of
         Tokenizer.INT v  => (SUBTREE(INT v))::stack
       | Tokenizer.WORD v => (CTOR_AWAITING_ARGS v)::stack
       | Tokenizer.OP v   => (CTOR_AWAITING_ARGS v)::stack
       | Tokenizer.SPECIAL v =>
-        raise Tokenizer.SyntaxError(pos, "Unexpected special character: \""^Char.toString v^"\" when stack is "^stack2str stack)
-fun finalize(stack) = stack (* TODO *)
+        raise T.SyntaxError(pos, "Unexpected special character: \""^Char.toString v^"\" when stack is "^stack2str stack)
+fun finalize([SUBTREE v]) = [v] (* TODO *)
+  | finalize(stack) = raise T.SyntaxError((~1,~1), "Unexpected EOF: "^stack2str stack)
             (* (List.app (fn (_,t)=>  print(Tokenizer.tok2s t^"...\n")) stack; stack) *)
     in
         {initState=[],
@@ -75,17 +90,24 @@ fun finalize(stack) = stack (* TODO *)
          finalize=finalize}
     end
 
+fun parse_string synspec s =
+    let val consumer : (ParserStack, CST list) Tokenizer.consumer =
+            make_stackbased_consumer synspec
+    in Tokenizer.tokenize_string(s,consumer)
+    end
 
 fun parse_file synspec filename =
-    let val consumer : (ParserStack, ParserStack) Tokenizer.consumer =
+    let val consumer : (ParserStack, CST list) Tokenizer.consumer =
             make_stackbased_consumer synspec
             (* {initState=(), *)
             (*  step=(fn ((),(_,t)) => print(Tokenizer.tok2s(t)^"\n")), *)
             (*  finalize=fn() => ()} *)
-    in Tokenizer.read_file(filename,consumer)
+    in Tokenizer.tokenize_file(filename,consumer)
     end
 end;
+end;
 
+(*
 fun test() =
     PrologStyleParser.print_stack(PrologStyleParser.parse_file [] "test2.txt")
     handle Tokenizer.SyntaxError(pos as (line,col),msg) =>
@@ -93,3 +115,4 @@ fun test() =
             raise Tokenizer.SyntaxError(pos,msg))
 
 val _ = test()
+ *)

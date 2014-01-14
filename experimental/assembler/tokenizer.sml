@@ -8,8 +8,12 @@ sig
       {finalize:'a -> 'b, initState:'a, step:'a * postoken -> 'a}
     exception SyntaxError of position * string
     val tok2s : token -> string
-    val tokenize_line : int -> string -> postoken list
-    val read_file : string * ('a,'b) consumer -> 'b
+    (* val tokenize_line : int -> string -> postoken list *)
+    val tokenize_stream : (TextIO.instream * ('a,'b) consumer) -> 'b
+    val tokenize_string : string * ('a,'b) consumer -> 'b
+    val tokenize_file   : string * ('a,'b) consumer -> 'b
+
+    val accumulator_consumer : (postoken list, postoken list) consumer
 end;
 
 structure Tokenizer : TOKENIZER =
@@ -57,17 +61,17 @@ struct
               else let val (tok,rest,taken) =
                        if Char.isDigit c
                        then let val (tokstr,cs',taken0) = takeWhile2 Char.isDigit (cs,[c])
-                            in (INT((Option.valOf o Int.fromString o implode) tokstr), cs', taken0)
+                            in (INT((Option.valOf o Int.fromString o implode) tokstr), cs', 1+taken0)
                             end
                        else if Char.isAlpha c
                        then let val (tokstr,cs',taken0) = takeWhile2 isAlphaNumOrUnderscore (cs,[c])
-                            in (WORD(implode tokstr), cs', taken0)
+                            in (WORD(implode tokstr), cs', 1+taken0)
                             end
                        else if List.exists (fn special => c=special) (explode ",()[]{}")
                        then (SPECIAL c, cs, 1)
                        else if isOperatorChar c
                        then let val (tokstr,cs',taken0) = takeWhile2 isOperatorChar (cs,[c])
-                            in (OP(implode tokstr), cs', taken0)
+                            in (OP(implode tokstr), cs', 1+taken0)
                             end
                        else raise SyntaxError((lineNr,col), "Bad character: '"^implode[c]^"'")
                    in
@@ -78,13 +82,11 @@ struct
       end : postoken list
       (* ([((lineNr,0), ATOM "dummy")] : postoken list) *)
 
-
-  fun read_file(filename, consumer: ('s,'r) consumer) =
-      let val f = TextIO.openIn(filename)
-          val {initState=s0, step=consumerStep, finalize=consumerFinalize} =
+  fun tokenize_stream(stream, consumer: ('s,'r) consumer) =
+      let val {initState=s0, step=consumerStep, finalize=consumerFinalize} =
               consumer
-          fun line_loop(s, f, lineNr) =
-              (case TextIO.inputLine f of
+          fun line_loop(s, stream, lineNr) =
+              (case TextIO.inputLine stream of
                    NONE => s
                  | SOME(line) =>
                    let
@@ -93,21 +95,39 @@ struct
                                     (fn (t,ss)=>consumerStep(ss,t))
                                     s tokens
                    in
-                       line_loop(s2, f, lineNr+1)
+                       line_loop(s2, stream, lineNr+1)
                    end)
       in
-          consumerFinalize(line_loop(s0, f, 1))
+          consumerFinalize(line_loop(s0, stream, 1))
+      end
+
+  fun tokenize_string(s, consumer: ('s,'r) consumer) =
+      let val stream = TextIO.openString(s)
+      in
+          tokenize_stream(stream, consumer)
+          before TextIO.closeIn(stream)
+      end
+
+  fun tokenize_file(filename, consumer: ('s,'r) consumer) =
+      let val f = TextIO.openIn(filename)
+      in
+          tokenize_stream(f, consumer)
           before TextIO.closeIn(f)
       end
-(* fun token() =  *)
+
+    val accumulator_consumer : (postoken list, postoken list) consumer
+      = {initState=[],
+         step=fn(s,t)=>t::s,
+         finalize=rev}
+
 end
 
 (* val s = "Hello, World!" *)
 (* val _ = print(s^"\n") *)
-fun test() =
-    Tokenizer.read_file("test.txt",
-                            {initState=(),
-                             step=(fn ((),(_,t)) => print(Tokenizer.tok2s(t)^"\n")),
-                             finalize=fn() => ()})
+(* fun test() = *)
+(*     Tokenizer.tokenize_file("test.txt", *)
+(*                             {initState=(), *)
+(*                              step=(fn ((),(_,t)) => print(Tokenizer.tok2s(t)^"\n")), *)
+(*                              finalize=fn() => ()}) *)
 
 (* val _ = test() *)
