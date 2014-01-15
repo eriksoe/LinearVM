@@ -3,7 +3,7 @@ structure PrologStyleParser =
 struct
 datatype Fixity = PREFIX | INFIX_L | INFIX_R | POSTFIX
 type Priority = int
-type synspec = (string * (Fixity * Priority)) list
+type Synspec = (string * (Fixity * Priority)) list
 
 (* Concrete syntax tree *)
 datatype CST = INT of int
@@ -16,6 +16,9 @@ datatype ParserStackElem = PREFIX_ELEM of string * Priority
                          | SUBTREE of CST;
 
 type ParserStack = ParserStackElem list
+
+val infinitePrio = 1000000;
+val commaPrio = 1000;
 
 fun lookup key [] = NONE
   | lookup key ((k,v)::rest) =
@@ -84,16 +87,12 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
   | step((CTOR_AWAITING_ARGS(tag))::stack, othertoken) =
     (* atom-without-args case. *)
     step(SUBTREE(NODE(tag,[]))::stack, othertoken)
-  | step((SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack, (pos, T.SPECIAL(#","))) =
-    CTOR_COLLECTING_ARGS(tag,v::rargs)::stack
-  | step((SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack, (pos, T.SPECIAL(#")"))) =
-    SUBTREE(NODE(tag,rev(v::rargs)))::stack
   | step((CTOR_COLLECTING_ARGS(tag,[]))::stack, (pos, T.SPECIAL(#")"))) =
     (* Special case: 0-ary constructor used with parentheses *)
     SUBTREE(NODE(tag,[]))::stack
   | step(stack, (pos, T.OP ".")) =
     (* Terminator symbol. *)
-    (case reduce_for_priority(1000000,stack) of
+    (case reduce_for_priority(infinitePrio,stack) of
         [SUBTREE v] => [SUBTREE v]
       | _ => raise T.SyntaxError(pos,"\".\" not expected ; context is "^stack2str stack) (* TODO: add description of open constructs *)
     )
@@ -106,8 +105,20 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
       | T.OP v   => (CTOR_AWAITING_ARGS v)::stack
       | T.SPECIAL v =>
         (case v of
-             #"," =>
-             handle_infix_or_postfix(",",pos,synspec,stack)
+             #")" =>
+             (case reduce_for_priority(infinitePrio,stack) of
+                  (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
+                  SUBTREE(NODE(tag,rev(v::rargs)))::stack2
+                | _ =>
+                  raise T.SyntaxError(pos, "Unexpected special character: \""^Char.toString v^"\" when stack is "^stack2str stack)
+             )
+           |  #"," =>
+              (case reduce_for_priority(commaPrio,stack) of
+                   (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
+                   CTOR_COLLECTING_ARGS(tag,v::rargs)::stack2
+                  | stack2 =>
+                  handle_infix_or_postfix(",",pos,synspec,stack2)
+              )
            | _ =>
              raise T.SyntaxError(pos, "Unexpected special character: \""^Char.toString v^"\" when stack is "^stack2str stack)
         )
