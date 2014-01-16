@@ -90,6 +90,10 @@ fun make_stackbased_consumer synspec : (ParserStack,CST list) T.consumer =
                  (INFIX_ELEM(operator,prio))::reduce_for_priority(prio,stack)
                | SOME(INFIX_R, prio) =>
                  (INFIX_ELEM(operator,prio))::reduce_for_priority(prio-1,stack)
+               | SOME(POSTFIX, prio) =>
+                 case reduce_for_priority(prio-1,stack) of
+                     (SUBTREE x)::stack2 =>
+                     (SUBTREE(NODE(operator, [x])))::stack2
                | _ =>                    (* Unknown or postfix *)
                  raise T.SyntaxError(pos, "Unexpected operator: "^operator^" ; context is "^stack2str stack) (* TODO: Provide context from stack *)
             )

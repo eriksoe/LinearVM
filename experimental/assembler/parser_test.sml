@@ -105,7 +105,8 @@ val synspec_arith = [("+", (INFIX_L, 500)),
                      ("-", (INFIX_L, 500)),
                      ("*", (INFIX_L, 400)),
                      ("::", (INFIX_R, 800)),
-                     ("&", (PREFIX, 450))
+                     ("&", (PREFIX, 450)),
+                     ("!", (POSTFIX, 450))
                     ]
 
 val synspec_special = [(",", (INFIX_L, 1000))]
@@ -153,12 +154,26 @@ val _ =
           (* Prefix operators *)
           should("handle prefix operators",
                 fn() => assertEqual(parse_string synspec_arith "&1.", [NODE("&",[INT 1])])),
+          should("handle double prefix operators",
+                fn() => assertEqual(parse_string synspec_arith "& &1.", [NODE("&",[NODE("&",[INT 1])])])),
           should("handle prefix priorities vs. infix (*&)",
                 fn() => assertEqual(parse_string synspec_arith "3 * &1.", [NODE("*", [INT 3,NODE("&",[INT 1])])])),
           should("handle prefix priorities vs. infix (&+)",
                 fn() => assertEqual(parse_string synspec_arith "&1 + 3.", [NODE("+", [NODE("&",[INT 1]), INT 3])])),
           should("handle prefix priorities vs. infix (&*)",
                 fn() => assertEqual(parse_string synspec_arith "&1 * 3.", [NODE("&", [NODE("*",[INT 1, INT 3])])])),
+
+          (* Postfix operators *)
+          should("handle postfix operators",
+                fn() => assertEqual(parse_string synspec_arith "1! .", [NODE("!",[INT 1])])),
+          should("handle double postfix operators",
+                fn() => assertEqual(parse_string synspec_arith "1! ! .", [NODE("!",[NODE("!",[INT 1])])])),
+          should("handle postfix priorities vs. infix (!*)",
+                fn() => assertEqual(parse_string synspec_arith "3! * 1.", [NODE("*", [NODE("!",[INT 3]), INT 1])])),
+          should("handle postfix priorities vs. infix (+!)",
+                fn() => assertEqual(parse_string synspec_arith "1 + 3! .", [NODE("+", [INT 1, NODE("!",[INT 3])])])),
+          should("handle postfix priorities vs. infix (*!)",
+                fn() => assertEqual(parse_string synspec_arith "1 * 3! .", [NODE("!", [NODE("*",[INT 1, INT 3])])])),
 
          (* Interactions. *)
           should("handle infix-in-explicit (1: right-paren)",
