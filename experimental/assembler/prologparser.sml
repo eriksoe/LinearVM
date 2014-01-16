@@ -82,6 +82,11 @@ fun make_stackbased_consumer synspec : (ParserStack,CST list) T.consumer =
                  raise T.SyntaxError(pos, "Unexpected operator: "^operator^" ; context is "^stack2str stack) (* TODO: Provide context from stack *)
             )
 
+        fun handle_op(stack as (SUBTREE n)::_, operator, pos) =
+            handle_infix_or_postfix(operator,pos,synspec,stack)
+          | handle_op(stack, operator, pos) =
+            (CTOR_AWAITING_ARGS operator)::stack
+
 fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
     CTOR_COLLECTING_ARGS(tag,[])::stack
   | step((CTOR_AWAITING_ARGS(tag))::stack, othertoken) =
@@ -96,8 +101,6 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
         [SUBTREE v] => [SUBTREE v]
       | _ => raise T.SyntaxError(pos,"\".\" not expected ; context is "^stack2str stack) (* TODO: add description of open constructs *)
     )
-  | step(stack as (SUBTREE _)::_, (pos, T.OP operator)) =
-    handle_infix_or_postfix(operator,pos,synspec,stack)
   | step(stack, postoken as (pos,T.SPECIAL #")")) =
     (case reduce_for_priority(infinitePrio,stack) of
          (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
@@ -112,12 +115,10 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
        | stack2 =>
          handle_infix_or_postfix(",",pos,synspec,stack2)
     )
-  | step(stack, postoken as (pos,token)) =
-    case token of
-        T.INT v  => (SUBTREE(INT v))::stack
-      | T.WORD v => (CTOR_AWAITING_ARGS v)::stack
-      | T.OP v   => (CTOR_AWAITING_ARGS v)::stack
-      | T.SPECIAL v =>
+  | step(stack, (pos, T.INT v)) = (SUBTREE(INT v))::stack
+  | step(stack, (pos, T.WORD v)) = (CTOR_AWAITING_ARGS v)::stack
+  | step(stack, (pos, T.OP v)) = handle_op(stack, v, pos)
+  | step(stack, (pos, T.SPECIAL v)) =
         raise T.SyntaxError(pos, "Unexpected \""^Char.toString v^"\" when stack is "^stack2str stack)
 
 fun finalize([SUBTREE v]) = [v] (* TODO *)
