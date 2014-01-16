@@ -98,30 +98,27 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
     )
   | step(stack as (SUBTREE _)::_, (pos, T.OP operator)) =
     handle_infix_or_postfix(operator,pos,synspec,stack)
+  | step(stack, postoken as (pos,T.SPECIAL #")")) =
+    (case reduce_for_priority(infinitePrio,stack) of
+         (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
+         SUBTREE(NODE(tag,rev(v::rargs)))::stack2
+       | _ =>
+         raise T.SyntaxError(pos, "Unexpected \")\" when stack is "^stack2str stack)
+    )
+  | step(stack, postoken as (pos,T.SPECIAL #",")) =
+    (case reduce_for_priority(commaPrio,stack) of
+         (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
+         CTOR_COLLECTING_ARGS(tag,v::rargs)::stack2
+       | stack2 =>
+         handle_infix_or_postfix(",",pos,synspec,stack2)
+    )
   | step(stack, postoken as (pos,token)) =
     case token of
         T.INT v  => (SUBTREE(INT v))::stack
       | T.WORD v => (CTOR_AWAITING_ARGS v)::stack
       | T.OP v   => (CTOR_AWAITING_ARGS v)::stack
       | T.SPECIAL v =>
-        (case v of
-             #")" =>
-             (case reduce_for_priority(infinitePrio,stack) of
-                  (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
-                  SUBTREE(NODE(tag,rev(v::rargs)))::stack2
-                | _ =>
-                  raise T.SyntaxError(pos, "Unexpected special character: \""^Char.toString v^"\" when stack is "^stack2str stack)
-             )
-           |  #"," =>
-              (case reduce_for_priority(commaPrio,stack) of
-                   (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
-                   CTOR_COLLECTING_ARGS(tag,v::rargs)::stack2
-                  | stack2 =>
-                  handle_infix_or_postfix(",",pos,synspec,stack2)
-              )
-           | _ =>
-             raise T.SyntaxError(pos, "Unexpected special character: \""^Char.toString v^"\" when stack is "^stack2str stack)
-        )
+        raise T.SyntaxError(pos, "Unexpected \""^Char.toString v^"\" when stack is "^stack2str stack)
 
 fun finalize([SUBTREE v]) = [v] (* TODO *)
   | finalize(stack) = raise T.SyntaxError((~1,~1), "Unexpected EOF: "^stack2str stack)
