@@ -44,6 +44,10 @@ fun print_stack s = print(stack2str s)
 (*   | print_stack((PREFIX_ELEM _)::_) = print "Stack has PREFIX_ELEM as top element.\n" *)
 (*   | print_stack((INFIX_ELEM _)::_) = print "Stack has INFIX_ELEM as top element.\n"; *)
 
+fun is_prefix(PREFIX) = true
+  | is_prefix _ = false
+fun is_nonprefix fixity = not(is_prefix fixity)
+
 fun make_simple_consumer synspec =
     let fun step(stack, token:T.postoken) = token::stack
         fun finalize(stack) =
@@ -59,6 +63,9 @@ val init : ParserStack = []
 
 fun make_stackbased_consumer synspec : (ParserStack,CST list) T.consumer =
     let
+        val synspec_prefix = List.filter (fn (_,(fixity,_)) => is_prefix fixity) synspec;
+        val synspec_inpostfix = List.filter (fn (_,(fixity,_)) => is_nonprefix fixity) synspec;
+
         fun reduce_for_priority(prio, stack) =
             case stack of
                 (* TODO: handle prefix/postfix/infix ops *)
@@ -70,10 +77,15 @@ fun make_stackbased_consumer synspec : (ParserStack,CST list) T.consumer =
                 then reduce_for_priority(prio,
                                          (SUBTREE(NODE(f,[x,y])))::rest)
                 else stack
+              | (SUBTREE x)::(PREFIX_ELEM(f,fprio))::rest =>
+                if fprio<=prio  (* TODO: handle difference-of-1 case *)
+                then reduce_for_priority(prio,
+                                         (SUBTREE(NODE(f,[x])))::rest)
+                else stack
               | _ => stack;
 
         fun handle_infix_or_postfix(operator,pos,synspec,stack) =
-            (case lookup operator synspec of
+            (case lookup operator synspec_inpostfix of
                  SOME(INFIX_L, prio) =>
                  (INFIX_ELEM(operator,prio))::reduce_for_priority(prio,stack)
                | SOME(INFIX_R, prio) =>
@@ -82,10 +94,16 @@ fun make_stackbased_consumer synspec : (ParserStack,CST list) T.consumer =
                  raise T.SyntaxError(pos, "Unexpected operator: "^operator^" ; context is "^stack2str stack) (* TODO: Provide context from stack *)
             )
 
+        fun handle_prefix_or_nonop(stack, operator, pos) =
+            (case lookup operator synspec_prefix of
+                 SOME(PREFIX,prio) =>
+                 (PREFIX_ELEM(operator,prio))::stack (* TODO: check nonassoc clash? *)
+               |  NONE => (CTOR_AWAITING_ARGS operator)::stack
+            )
         fun handle_op(stack as (SUBTREE n)::_, operator, pos) =
             handle_infix_or_postfix(operator,pos,synspec,stack)
           | handle_op(stack, operator, pos) =
-            (CTOR_AWAITING_ARGS operator)::stack
+            handle_prefix_or_nonop(stack, operator, pos)
 
 fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
     CTOR_COLLECTING_ARGS(tag,[])::stack
@@ -121,8 +139,11 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
   | step(stack, (pos, T.SPECIAL v)) =
         raise T.SyntaxError(pos, "Unexpected \""^Char.toString v^"\" when stack is "^stack2str stack)
 
-fun finalize([SUBTREE v]) = [v] (* TODO *)
-  | finalize(stack) = raise T.SyntaxError((~1,~1), "Unexpected EOF: "^stack2str stack)
+fun finalize stack =
+    case reduce_for_priority(infinitePrio,stack) of
+        [SUBTREE v] => [v]
+      | stack' =>
+        raise T.SyntaxError((~1,~1), "Unexpected EOF: "^stack2str stack')
             (* (List.app (fn (_,t)=>  print(T.tok2s t^"...\n")) stack; stack) *)
     in
         {initState=[],
