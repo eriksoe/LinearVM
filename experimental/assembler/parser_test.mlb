@@ -4,12 +4,14 @@ local $(SML_LIB)/basis/basis.mlb in
 (* Program files *)
 tokenizer.sml
 prologparser.sml
+asmparser.sml
 
 (* Test stuff *)
 DescribeSML/src/assert.sml
-(*DescribeSML/src/expect.sml*)
+DescribeSML/src/expect.sml
 DescribeSML/src/spec-reporter.sml
 DescribeSML/src/describe.sml
 
 parser_test.sml
+asmparser_test.sml
 end

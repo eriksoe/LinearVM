@@ -7,3 +7,6 @@ use "DescribeSML/src/spec-reporter.sml";
 use "DescribeSML/src/describe.sml";
 
 use "parser_test.sml";
+
+use "asmparser.sml";
+use "asmparser_test.sml";
