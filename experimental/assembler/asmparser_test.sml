@@ -7,6 +7,7 @@ open Expect
 structure T = Tokenizer
 structure PP = PrologStyleParser
 structure AP = AsmParser
+structure A = AsmAST
 
 fun tokenize s = tokenize_string(s,accumulator_consumer)
 
@@ -15,9 +16,13 @@ val () =
           (* Trivial *)
           should("handle typedef",
               fn()=> expect (AP.parse_string "typedef(t1, t=>t).")
+(*
                             toEqual([NODE("typedef", [NODE("t1",[]),
                                                       NODE("=>", [NODE("t",[]),
-                                                                  NODE("t",[])])])]))
+                                                                  NODE("t",[])])])])
+*)
+                            toEqual([A.TYPEDEF("t1", A.TYABS("t",A.TYVAR("t")))])
+                )
          ])
 
     (*
