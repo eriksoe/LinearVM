@@ -5,6 +5,7 @@ use "prologparser.sml";
 use "DescribeSML/src/assert.sml";
 use "DescribeSML/src/spec-reporter.sml";
 use "DescribeSML/src/describe.sml";
+use "DescribeSML/src/expect.sml";
 
 use "parser_test.sml";
 

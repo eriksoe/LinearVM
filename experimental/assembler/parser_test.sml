@@ -184,9 +184,24 @@ val _ =
                                     [NODE("foo",[NODE("+",[INT 1, INT 2]), INT 3])])),
           should("handle explicit-in-infix",
                 fn() => assertEqual(parse_string synspec_arith "1+foo(2)+3.",
-                                    [NODE("+",[NODE("+",[INT 1, NODE("foo",[INT 2])]), INT 3])]))
+                                    [NODE("+",[NODE("+",[INT 1, NODE("foo",[INT 2])]), INT 3])])),
 
-         (* TODO: Parentheses *)
+         (* Parentheses *)
+          should("handle simple parenthesis",
+                fn() => assertEqual(parse_string synspec0 "(123).", [INT 123])),
+          should("handle ctor in parenthesis",
+                fn() => assertEqual(parse_string synspec0 "(a()).", [NODE("a",[])])),
+          should("handle binop in parenthesis",
+                fn() => assertEqual(parse_string synspec_arith "(12+3).", [NODE("+",[INT 12,INT 3])])),
+
+         (* '{}' *)
+          should("handle empty curly-group",
+                fn() => assertEqual(parse_string synspec0 "{}.", [NODE("{}",[])])),
+          should("handle simple curly-group",
+                fn() => assertEqual(parse_string synspec0 "{123}.", [NODE("{}",[INT 123])])),
+          should("handle comma in curly-group",
+                fn() => assertEqual(parse_string synspec_special "{12,3}.", [NODE("{}",[NODE(",",[INT 12,INT 3])])]))
+
          (* TODO: '{}', '[]' constructors *)
          (* TODO: "priority-difference of 1" case *)
           ])
