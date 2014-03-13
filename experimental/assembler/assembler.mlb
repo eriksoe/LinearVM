@@ -4,5 +4,10 @@ local $(SML_LIB)/basis/basis.mlb in
 (* Program files *)
 tokenizer.sml
 prologparser.sml
+
+asm_ast.sml
+asmparser.sml
+asm_translate.sml
 asmmain.sml
+
 end

@@ -1,16 +1,7 @@
-structure AsmAST =
-struct
-  type Name = string
-  datatype Type = TYVAR of Name
-                | TYABS of Name * Type
-  datatype Decl = TYPEDEF of Name * Type
-  type AST = Decl list
-end
-
 local
     structure T = Tokenizer;
     structure P = PrologStyleParser;
-    open AsmAST
+    open AsmAST0
 in
 
 structure AsmParser =
@@ -27,7 +18,7 @@ val synspec : P.Synspec =
 fun parse_type(P.NODE("=>", [P.NODE(tyname,[]), body])) =
     TYABS(tyname, parse_type body)
   | parse_type(P.NODE(tyvar,[])) =
-    TYVAR(tyvar)
+    NAMED_TYPE([tyvar])
 
 fun parse_form(P.NODE("typedef", [P.NODE(name,[]), def])) =
     TYPEDEF(name, parse_type def)

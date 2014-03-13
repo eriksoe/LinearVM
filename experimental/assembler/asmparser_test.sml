@@ -23,9 +23,12 @@ val () =
 *)
                             toEqual([A.TYPEDEF("t1", A.TYABS("t",A.TYVAR("t")))])
                 )
+(* typedef(pair, (ta => tb => {a:ta, b:tb})). *)
+
          ])
 
     (*
      structure T=Tokenizer; structure AP=AsmParser;
 AP.parse_string "typedef(t1, t=>t)." handle e as T.SyntaxError(_,s) => (print s;raise e);
+AP.parse_string "typedef(pair, (ta => tb => {a:ta, b:tb}))." handle e as T.SyntaxError(_,s) => (print s;raise e);
  *)

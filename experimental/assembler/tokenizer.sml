@@ -55,6 +55,7 @@ struct
 
   fun tokenize_line lineNr (line:string) =
       let fun loop([], acc, col) = rev acc
+            | loop(#"%"::_, acc, col) = loop([], acc, col) (* Comment *)
             | loop(c::cs, acc, col) =
               if Char.isSpace c
               then loop(cs, acc, col+1)
