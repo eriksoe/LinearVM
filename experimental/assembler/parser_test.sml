@@ -43,11 +43,11 @@ val _ =
           should("handle short operators",
               fn() => assertEqual([OP "!", OP "#", OP "$", OP "%",
                                    OP "&", OP "*", OP "+", OP "-",
-                                   OP ".", OP "/", OP ":", OP ";",
-                                   OP "<", OP "=", OP ">", OP "?",
-                                   OP "@", OP "\\", OP "^", OP "`",
-                                   OP "|", OP "~"],
-                                  map #2 (tokenize "! # $ % & * + - . / : ; < = > ? @ \\ ^ ` | ~"))),
+                                   OP "/", OP ":", OP ";", OP "<",
+                                   OP "=", OP ">", OP "?", OP "@",
+                                   OP "\\", OP "^", OP "`", OP "|",
+                                   OP "~"],
+                                  map #2 (tokenize "! # $ % & * + - / : ; < = > ? @ \\ ^ ` | ~"))),
           should("handle long operators",
               fn() => assertEqual([OP "++",
                                    OP "->",
@@ -200,12 +200,17 @@ val _ =
           should("handle simple curly-group",
                 fn() => assertEqual(parse_string synspec0 "{123}.", [NODE("{}",[INT 123])])),
           should("handle comma in curly-group",
-                fn() => assertEqual(parse_string synspec_special "{12,3}.", [NODE("{}",[NODE(",",[INT 12,INT 3])])]))
+                fn() => assertEqual(parse_string synspec_special "{12,3}.", [NODE("{}",[NODE(",",[INT 12,INT 3])])])),
 
          (* TODO: '{}', '[]' constructors *)
          (* TODO: "priority-difference of 1" case *)
-          ])
 
+         (* Multiple terms *)
+          should("handle multiple terms",
+                fn() => assertEqual(parse_string synspec0 "a. b. 12.",
+                                    [NODE("a",[]), NODE("b",[]), INT 12]))
+
+         ])
 
     (*
      open Tokenizer; open PrologStyleParser;

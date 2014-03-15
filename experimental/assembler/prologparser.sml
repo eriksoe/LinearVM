@@ -18,6 +18,7 @@ datatype ParserStackElem = PREFIX_ELEM of string * Priority
                          | SUBTREE of CST;
 
 type ParserStack = ParserStackElem list
+type ParserState = CST list * ParserStack
 
 val infinitePrio = 1000000;
 val commaPrio = 1000;
@@ -62,17 +63,14 @@ fun make_simple_consumer synspec =
          finalize=finalize}
     end
 
-val init : ParserStack = []
 
-
-fun make_stackbased_consumer synspec : (ParserStack,CST list) T.consumer =
+fun make_stackbased_consumer synspec : (ParserState, CST list) T.consumer =
     let
         val synspec_prefix = List.filter (fn (_,(fixity,_)) => is_prefix fixity) synspec;
         val synspec_inpostfix = List.filter (fn (_,(fixity,_)) => is_nonprefix fixity) synspec;
 
         fun reduce_for_priority(prio, stack) =
             case stack of
-                (* TODO: handle prefix/postfix/infix ops *)
                 (CTOR_AWAITING_ARGS v)::rest =>
                 reduce_for_priority(prio,
                                     SUBTREE(NODE(v,[]))::rest)
@@ -122,12 +120,6 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
   | step((CTOR_COLLECTING_ARGS(tag,[]))::stack, (pos, T.SPECIAL(#")"))) =
     (* Special case: 0-ary constructor used with parentheses *)
     SUBTREE(NODE(tag,[]))::stack
-  | step(stack, (pos, T.OP ".")) =
-    (* Terminator symbol. *)
-    (case reduce_for_priority(infinitePrio,stack) of
-        [SUBTREE v] => [SUBTREE v]
-      | _ => raise T.SyntaxError(pos,"\".\" not expected ; context is "^stack2str stack) (* TODO: add description of open constructs *)
-    )
   | step(stack, postoken as (pos,T.SPECIAL #")")) =
     (case reduce_for_priority(infinitePrio,stack) of
          (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
@@ -161,26 +153,34 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
   | step(stack, (pos, T.SPECIAL v)) =
         raise T.SyntaxError(pos, "Unexpected \""^Char.toString v^"\" when stack is "^stack2str stack)
 
-fun finalize stack =
-    case reduce_for_priority(infinitePrio,stack) of
-        [SUBTREE v] => [v]
+fun step2((terms,stack), (pos,T.OP ".")) =
+    (* Terminator symbol. *)
+    (case reduce_for_priority(infinitePrio,stack) of
+        [SUBTREE v] => (v::terms, [])
       | stack' =>
-        raise T.SyntaxError((~1,~1), "Unexpected EOF: "^stack2str stack')
-            (* (List.app (fn (_,t)=>  print(T.tok2s t^"...\n")) stack; stack) *)
+        raise T.SyntaxError(pos,"\".\" not expected ; context is "^stack2str stack) (* TODO: add description of open constructs *)
+    )
+  | step2((terms,stack), token) =
+    (terms, step(stack, token))
+
+fun finalize (terms,[]) = rev terms
+  | finalize (terms,stack) =
+    raise T.SyntaxError((~1,~1), "Unexpected EOF: "^stack2str stack)
+
     in
-        {initState=[],
-         step=step,
+        {initState=([],[]),
+         step=step2,
          finalize=finalize}
     end
 
 fun parse_string synspec s =
-    let val consumer : (ParserStack, CST list) T.consumer =
+    let val consumer : (ParserState, CST list) T.consumer =
             make_stackbased_consumer synspec
     in T.tokenize_string(s,consumer)
     end
 
 fun parse_file synspec filename =
-    let val consumer : (ParserStack, CST list) T.consumer =
+    let val consumer : (ParserState, CST list) T.consumer =
             make_stackbased_consumer synspec
             (* {initState=(), *)
             (*  step=(fn ((),(_,t)) => print(T.tok2s(t)^"\n")), *)
