@@ -1,7 +1,7 @@
 local
     structure T = Tokenizer;
     structure P = PrologStyleParser;
-    open AsmAST0
+    structure A = AsmAST0
 in
 
 structure AsmParser =
@@ -16,12 +16,12 @@ val synspec : P.Synspec =
      ("::", (P.INFIX_L,100))];
 
 fun parse_type(P.NODE("=>", [P.NODE(tyname,[]), body])) =
-    TYABS(tyname, parse_type body)
+    A.TYABS(tyname, parse_type body)
   | parse_type(P.NODE(tyvar,[])) =
-    NAMED_TYPE([tyvar])
+    A.NAMED_TYPE([tyvar])
 
 fun parse_form(P.NODE("typedef", [P.NODE(name,[]), def])) =
-    TYPEDEF(name, parse_type def)
+    A.TYPEDEF(name, parse_type def)
 
 fun parse_string s =
     let

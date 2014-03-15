@@ -7,7 +7,7 @@ open Expect
 structure T = Tokenizer
 structure PP = PrologStyleParser
 structure AP = AsmParser
-structure A = AsmAST
+structure A = AsmAST0
 
 fun tokenize s = tokenize_string(s,accumulator_consumer)
 
@@ -21,7 +21,7 @@ val () =
                                                       NODE("=>", [NODE("t",[]),
                                                                   NODE("t",[])])])])
 *)
-                            toEqual([A.TYPEDEF("t1", A.TYABS("t",A.TYVAR("t")))])
+                            toEqual([A.TYPEDEF("t1", A.TYABS("t",A.NAMED_TYPE(["t"])))])
                 )
 (* typedef(pair, (ta => tb => {a:ta, b:tb})). *)
 
