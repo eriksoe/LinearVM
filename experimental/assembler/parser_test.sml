@@ -201,7 +201,18 @@ val _ =
           should("handle comma in curly-group",
                 fn() => assertEqual(parse_string synspec_special "{12,3}.", [NODE("{}",[NODE(",",[INT 12,INT 3])])])),
 
-         (* TODO: '{}', '[]' constructors *)
+         (* Lists *)
+          should("handle the empty list",
+                fn() => assertEqual(parse_string synspec0 "[]. [ ].",
+                                    [LIST [], LIST []])),
+
+          should("handle singletons lists",
+                fn() => assertEqual(parse_string synspec0 "[a]. [f()].",
+                                    [LIST [NODE("a",[])], LIST [NODE("f",[])]])),
+          should("handle multi-element lists",
+                fn() => assertEqual(parse_string synspec0 "[a,2,c,4].",
+                                    [LIST [NODE("a",[]), INT 2, NODE("c",[]), INT 4]])),
+
          (* TODO: "priority-difference of 1" case *)
 
          (* Multiple terms *)

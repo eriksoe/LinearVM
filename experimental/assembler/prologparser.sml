@@ -9,11 +9,13 @@ type Synspec = (string * (Fixity * Priority)) list
 datatype CST = INT of int
              | STRING of string
              | NODE of string * CST list
+             | LIST of CST list
 datatype ParserStackElem = PREFIX_ELEM of string * Priority
                          | INFIX_ELEM of string * Priority
                          | CTOR_AWAITING_ARGS of string
                          | CTOR_COLLECTING_ARGS of string * CST list
                          | START_PAREN
+                         | LIST_ACC of CST list
                          | START_CURLY
                          | SUBTREE of CST;
 
@@ -39,6 +41,7 @@ fun stack2str([]) = "Stack is empty.\n"
   | stack2str((INFIX_ELEM _)::rest) = "Stack has INFIX_ELEM as top element. Rest of the stack is: "^stack2str rest^"\n"
   | stack2str((SUBTREE v)::rest) = "Stack has SUBTREE as top element; value is "^cst2str v^". Rest of the stack is: "^stack2str rest^"\n"
   | stack2str(START_PAREN::rest) = "Stack has '(' as top element. Rest of the stack is: "^stack2str rest^"\n"
+  | stack2str((LIST_ACC _)::rest) = "Stack has '[' as top element. Rest of the stack is: "^stack2str rest^"\n"
   | stack2str(START_CURLY::rest) = "Stack has '{' as top element. Rest of the stack is: "^stack2str rest^"\n";
 
 fun print_stack s = print(stack2str s)
@@ -129,6 +132,15 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
        | _ =>
          raise T.SyntaxError(pos, "Unexpected \")\" when stack is "^stack2str stack)
     )
+  | step(stack, postoken as (pos,T.SPECIAL #"]")) =
+    (case reduce_for_priority(infinitePrio,stack) of
+         (LIST_ACC vs)::stack2 =>
+         (SUBTREE(LIST(rev vs)))::stack2
+       | (SUBTREE v)::(LIST_ACC vs)::stack2 =>
+         (SUBTREE(LIST(rev(v::vs))))::stack2
+       | _ =>
+         raise T.SyntaxError(pos, "Unexpected \"]\" when stack is "^stack2str stack)
+    )
   | step(stack, postoken as (pos,T.SPECIAL #"}")) =
     (case reduce_for_priority(infinitePrio,stack) of
          START_CURLY::stack2 =>
@@ -136,16 +148,19 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
        | (SUBTREE v)::START_CURLY::stack2 =>
          (SUBTREE(NODE("{}",[v])))::stack2
        | _ =>
-         raise T.SyntaxError(pos, "Unexpected \")\" when stack is "^stack2str stack)
+         raise T.SyntaxError(pos, "Unexpected \"}\" when stack is "^stack2str stack)
     )
   | step(stack, postoken as (pos,T.SPECIAL #",")) =
     (case reduce_for_priority(commaPrio,stack) of
          (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
          CTOR_COLLECTING_ARGS(tag,v::rargs)::stack2
+       | (SUBTREE v)::(LIST_ACC vs)::stack2 =>
+         LIST_ACC(v::vs)::stack2
        | stack2 =>
          handle_infix_or_postfix(",",pos,synspec,stack2)
     )
   | step(stack, (pos, T.SPECIAL #"(")) = START_PAREN::stack
+  | step(stack, (pos, T.SPECIAL #"[")) = (LIST_ACC [])::stack
   | step(stack, (pos, T.SPECIAL #"{")) = START_CURLY::stack
   | step(stack, (pos, T.INT v)) = (SUBTREE(INT v))::stack
   | step(stack, (pos, T.WORD v)) = (CTOR_AWAITING_ARGS v)::stack
