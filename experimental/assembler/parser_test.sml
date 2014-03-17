@@ -54,7 +54,14 @@ val _ =
                                    OP "-./:;<=>?@\\^`|~"],
                                   map #2 (tokenize "++ -> !#$%&*+ -./:;<=>?@\\^`|~"))),
           (* TODO: Non-alphanum words *)
-          (* TODO: Strings *)
+
+          (* Strings *)
+          should("handle the empty string literal",
+                 fn()=> assertEqual(tokenize "\"\"", [((1,1),STRINGLIT "")])),
+          should("handle a simple one-character string literal",
+                 fn()=> assertEqual(tokenize "\"x\"", [((1,1),STRINGLIT "x")])),
+          should("handle a simple multi-character string literal",
+                 fn()=> assertEqual(tokenize "\"abc 123-xyz\"", [((1,1),STRINGLIT "abc 123-xyz")])),
 
           (* Whitespace *)
           should("handle initial whitespace",

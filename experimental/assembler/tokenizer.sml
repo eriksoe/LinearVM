@@ -1,7 +1,7 @@
 signature TOKENIZER =
 sig
     datatype token
-      = INT of int | OP of string | SPECIAL of char | WORD of string
+      = INT of int | OP of string | SPECIAL of char | WORD of string | STRINGLIT of string
     type position = int * int
     type postoken = position * token
     type ('a,'b) consumer =
@@ -21,7 +21,8 @@ struct
   datatype token = INT of int
                  | WORD of string
                  | OP of string
-                 | SPECIAL of char; (* One of ",()[]{}" *)
+                 | SPECIAL of char (* One of ",()[]{}" *)
+                 | STRINGLIT of string;
   type position = int * int
   type postoken = position * token
   type ('s,'r) consumer = {
@@ -54,8 +55,25 @@ struct
       List.exists (fn opchar => c=opchar) (explode "!\"#$%&'*+-./:;<=>?@\\^_`|~")
 
   fun tokenize_line lineNr (line:string) =
-      let fun loop([], acc, col) = rev acc
+      let
+          fun parse_string_literal([], acc, col) =
+              raise SyntaxError((lineNr,col), "String literal still open at end of line")
+            | parse_string_literal(#"\""::cs, acc, col) =
+              (implode(rev acc), cs, col+1)
+            | parse_string_literal(#"\\"::cs, acc, col) =
+              (* TODO: Handle escape sequences. *)
+              raise SyntaxError((lineNr,col), "Bad escape sequence")
+            | parse_string_literal(c::cs, acc, col) =
+              if Char.isCntrl c
+              then raise SyntaxError((lineNr,col), "Bad control character in string literal: Character code "^Int.toString(ord c))
+              else parse_string_literal(cs, c::acc, col+1);
+
+          fun loop([], acc, col) = rev acc
             | loop(#"%"::_, acc, col) = loop([], acc, col) (* Comment *)
+            | loop(#"\""::cs, acc, col) =
+              let val (s,cs',col') = parse_string_literal(cs,[],col)
+              in loop(cs', ((lineNr,col),STRINGLIT s)::acc, col')
+              end
             | loop(c::cs, acc, col) =
               if Char.isSpace c
               then loop(cs, acc, col+1)
