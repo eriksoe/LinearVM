@@ -163,6 +163,7 @@ fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
   | step(stack, (pos, T.SPECIAL #"[")) = (LIST_ACC [])::stack
   | step(stack, (pos, T.SPECIAL #"{")) = START_CURLY::stack
   | step(stack, (pos, T.INT v)) = (SUBTREE(INT v))::stack
+  | step(stack, (pos, T.STRINGLIT v)) = (SUBTREE(STRING v))::stack
   | step(stack, (pos, T.WORD v)) = (CTOR_AWAITING_ARGS v)::stack
   | step(stack, (pos, T.OP v)) = handle_op(stack, v, pos)
   | step(stack, (pos, T.SPECIAL v)) =
