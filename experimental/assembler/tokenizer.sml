@@ -62,7 +62,22 @@ struct
               (implode(rev acc), cs, col+1)
             | parse_string_literal(#"\\"::cs, acc, col) =
               (* TODO: Handle escape sequences. *)
-              raise SyntaxError((lineNr,col), "Bad escape sequence")
+              (case cs of
+                   [] => raise SyntaxError((lineNr,col),
+                                           "\"\\\" at end of line in string literal")
+                 | #"a"::cs' => parse_string_literal(cs', #"\a"::acc, col+2)
+                 | #"b"::cs' => parse_string_literal(cs', #"\b"::acc, col+2)
+                 | #"f"::cs' => parse_string_literal(cs', #"\f"::acc, col+2)
+                 | #"t"::cs' => parse_string_literal(cs', #"\t"::acc, col+2)
+                 | #"n"::cs' => parse_string_literal(cs', #"\n"::acc, col+2)
+                 | #"r"::cs' => parse_string_literal(cs', #"\r"::acc, col+2)
+                 | #"v"::cs' => parse_string_literal(cs', #"\v"::acc, col+2)
+                 | #"\""::cs' => parse_string_literal(cs', #"\""::acc, col+2)
+                 | #"'"::cs' => parse_string_literal(cs', #"'"::acc, col+2)
+                 | c::_ => raise SyntaxError((lineNr,col),
+                                             "Bad escape sequence: \"\\"^Char.toString c^"\"")
+              )
+
             | parse_string_literal(c::cs, acc, col) =
               if Char.isCntrl c
               then raise SyntaxError((lineNr,col), "Bad control character in string literal: Character code "^Int.toString(ord c))

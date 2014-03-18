@@ -62,6 +62,8 @@ val _ =
                  fn()=> assertEqual(tokenize "\"x\"", [((1,1),STRINGLIT "x")])),
           should("handle a simple multi-character string literal",
                  fn()=> assertEqual(tokenize "\"abc 123-xyz\"", [((1,1),STRINGLIT "abc 123-xyz")])),
+          should("handle non-general escape sequences",
+                 fn()=> assertEqual(tokenize "\"\\a \\b \\f \\n \\r \\t \\v \\\" \\'\"", [((1,1),STRINGLIT "\a \b \f \n \r \t \v \" '")])),
 
           (* Whitespace *)
           should("handle initial whitespace",
