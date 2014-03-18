@@ -13,7 +13,7 @@ fun main(_,[asmfilename]) =
         (AsmParser.parse_string file_as_text;
          print "Parsed.\n")
         handle Tokenizer.SyntaxError(pos,err) =>
-               print ((pos2str pos)^": Syntax error: "^err)
+               print ((pos2str pos)^": Syntax error: "^err^"\n")
     end
   | main(cmdname,_) =
     print("Usage: "^cmdname^" <infile.asm>\n")
