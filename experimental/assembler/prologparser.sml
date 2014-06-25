@@ -4,19 +4,28 @@ struct
 datatype Fixity = PREFIX | INFIX_L | INFIX_R | POSTFIX
 type Priority = int
 type Synspec = (string * (Fixity * Priority)) list
+type Position = T.position
 
 (* Concrete syntax tree *)
+(*
 datatype CST = INT of int
              | STRING of string
              | NODE of string * CST list
              | LIST of CST list
-datatype ParserStackElem = PREFIX_ELEM of string * Priority
-                         | INFIX_ELEM of string * Priority
-                         | CTOR_AWAITING_ARGS of string
-                         | CTOR_COLLECTING_ARGS of string * CST list
-                         | START_PAREN
-                         | LIST_ACC of CST list
-                         | START_CURLY
+ *)
+datatype CST' = INT of int
+             | STRING of string
+             | NODE of string * CST list
+             | LIST of CST list
+withtype CST = Position * CST'
+
+datatype ParserStackElem = PREFIX_ELEM of Position * string * Priority
+                         | INFIX_ELEM of Position * string * Priority
+                         | CTOR_AWAITING_ARGS of Position * string
+                         | CTOR_COLLECTING_ARGS of Position * string * CST list
+                         | START_PAREN of Position
+                         | LIST_ACC of Position * CST list
+                         | START_CURLY of Position
                          | SUBTREE of CST;
 
 type ParserStack = ParserStackElem list
@@ -29,10 +38,11 @@ fun lookup key [] = NONE
   | lookup key ((k,v)::rest) =
     if k=key then SOME v else lookup key rest;
 
-fun cst2str(INT v) = "INT("^(Int.toString v)^")"
-  | cst2str(STRING v) = "STRING("^v^")"
-  | cst2str(NODE(tag,children)) = tag^"("^(String.concatWith ", " (map cst2str children))^")"
-  | cst2str(LIST vs) = "["^(String.concatWith "," (map cst2str vs))^"]"
+fun cst'2str(INT v) = "INT("^(Int.toString v)^")"
+  | cst'2str(STRING v) = "STRING("^v^")"
+  | cst'2str(NODE(tag,children)) = tag^"("^(String.concatWith ", " (map cst2str children))^")"
+  | cst'2str(LIST vs) = "["^(String.concatWith "," (map cst2str vs))^"]"
+and cst2str(pos,cst') = cst'2str(cst')
 
 fun stack2str([]) = "Stack is empty.\n"
   | stack2str([SUBTREE v]) = "Stack has one element: "^cst2str v^"\n"
@@ -41,9 +51,9 @@ fun stack2str([]) = "Stack is empty.\n"
   | stack2str((PREFIX_ELEM _)::_) = "Stack has PREFIX_ELEM as top element.\n"
   | stack2str((INFIX_ELEM _)::rest) = "Stack has INFIX_ELEM as top element. Rest of the stack is: "^stack2str rest^"\n"
   | stack2str((SUBTREE v)::rest) = "Stack has SUBTREE as top element; value is "^cst2str v^". Rest of the stack is: "^stack2str rest^"\n"
-  | stack2str(START_PAREN::rest) = "Stack has '(' as top element. Rest of the stack is: "^stack2str rest^"\n"
+  | stack2str((START_PAREN _)::rest) = "Stack has '(' as top element. Rest of the stack is: "^stack2str rest^"\n"
   | stack2str((LIST_ACC _)::rest) = "Stack has '[' as top element. Rest of the stack is: "^stack2str rest^"\n"
-  | stack2str(START_CURLY::rest) = "Stack has '{' as top element. Rest of the stack is: "^stack2str rest^"\n";
+  | stack2str((START_CURLY _)::rest) = "Stack has '{' as top element. Rest of the stack is: "^stack2str rest^"\n";
 
 fun print_stack s = print(stack2str s)
 (* fun print_stack([]) = print "Stack is empty.\n" *)
@@ -75,31 +85,31 @@ fun make_stackbased_consumer synspec : (ParserState, CST list) T.consumer =
 
         fun reduce_for_priority(prio, stack) =
             case stack of
-                (CTOR_AWAITING_ARGS v)::rest =>
+                (CTOR_AWAITING_ARGS(pos, v))::rest =>
                 reduce_for_priority(prio,
-                                    SUBTREE(NODE(v,[]))::rest)
-              | (SUBTREE y)::(INFIX_ELEM(f,fprio))::(SUBTREE x)::rest =>
+                                    SUBTREE(pos, NODE(v,[]))::rest)
+              | (SUBTREE y)::(INFIX_ELEM(pos,f,fprio))::(SUBTREE x)::rest =>
                 if fprio<=prio  (* TODO: handle difference-of-1 case *)
                 then reduce_for_priority(prio,
-                                         (SUBTREE(NODE(f,[x,y])))::rest)
+                                         (SUBTREE(pos,NODE(f,[x,y])))::rest)
                 else stack
-              | (SUBTREE x)::(PREFIX_ELEM(f,fprio))::rest =>
+              | (SUBTREE x)::(PREFIX_ELEM(pos,f,fprio))::rest =>
                 if fprio<=prio  (* TODO: handle difference-of-1 case *)
                 then reduce_for_priority(prio,
-                                         (SUBTREE(NODE(f,[x])))::rest)
+                                         (SUBTREE(pos,NODE(f,[x])))::rest)
                 else stack
               | _ => stack;
 
         fun handle_infix_or_postfix(operator,pos,synspec,stack) =
             (case lookup operator synspec_inpostfix of
                  SOME(INFIX_L, prio) =>
-                 (INFIX_ELEM(operator,prio))::reduce_for_priority(prio,stack)
+                 (INFIX_ELEM(pos,operator,prio))::reduce_for_priority(prio,stack)
                | SOME(INFIX_R, prio) =>
-                 (INFIX_ELEM(operator,prio))::reduce_for_priority(prio-1,stack)
+                 (INFIX_ELEM(pos,operator,prio))::reduce_for_priority(prio-1,stack)
                | SOME(POSTFIX, prio) =>
                  (case reduce_for_priority(prio-1,stack) of
                      (SUBTREE x)::stack2 =>
-                     (SUBTREE(NODE(operator, [x])))::stack2
+                     (SUBTREE(pos, NODE(operator, [x])))::stack2
                  )
                | _ =>                    (* Unknown or postfix *)
                  raise T.SyntaxError(pos, "Unexpected operator: "^operator^" ; context is "^stack2str stack) (* TODO: Provide context from stack *)
@@ -108,64 +118,64 @@ fun make_stackbased_consumer synspec : (ParserState, CST list) T.consumer =
         fun handle_prefix_or_nonop(stack, operator, pos) =
             (case lookup operator synspec_prefix of
                  SOME(PREFIX,prio) =>
-                 (PREFIX_ELEM(operator,prio))::stack (* TODO: check nonassoc clash? *)
-               |  NONE => (CTOR_AWAITING_ARGS operator)::stack
+                 (PREFIX_ELEM(pos,operator,prio))::stack (* TODO: check nonassoc clash? *)
+               |  NONE => (CTOR_AWAITING_ARGS(pos, operator))::stack
             )
         fun handle_op(stack as (SUBTREE n)::_, operator, pos) =
             handle_infix_or_postfix(operator,pos,synspec,stack)
           | handle_op(stack, operator, pos) =
             handle_prefix_or_nonop(stack, operator, pos)
 
-fun step((CTOR_AWAITING_ARGS(tag))::stack, (pos, T.SPECIAL(#"("))) =
-    CTOR_COLLECTING_ARGS(tag,[])::stack
-  | step((CTOR_AWAITING_ARGS(tag))::stack, othertoken) =
+fun step((CTOR_AWAITING_ARGS(pos_a, tag))::stack, (pos, T.SPECIAL(#"("))) =
+    CTOR_COLLECTING_ARGS(pos_a, tag,[])::stack
+  | step((CTOR_AWAITING_ARGS(pos_a, tag))::stack, othertoken) =
     (* atom-without-args case. *)
-    step(SUBTREE(NODE(tag,[]))::stack, othertoken)
-  | step((CTOR_COLLECTING_ARGS(tag,[]))::stack, (pos, T.SPECIAL(#")"))) =
+    step(SUBTREE(pos_a, NODE(tag,[]))::stack, othertoken)
+  | step((CTOR_COLLECTING_ARGS(pos_a,tag,[]))::stack, (pos_z, T.SPECIAL(#")"))) =
     (* Special case: 0-ary constructor used with parentheses *)
-    SUBTREE(NODE(tag,[]))::stack
+    SUBTREE(pos_a, NODE(tag,[]))::stack
   | step(stack, postoken as (pos,T.SPECIAL #")")) =
     (case reduce_for_priority(infinitePrio,stack) of
-         (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
-         SUBTREE(NODE(tag,rev(v::rargs)))::stack2
-       | (SUBTREE v)::START_PAREN::stack2 =>
+         (SUBTREE v)::(CTOR_COLLECTING_ARGS(pos_a, tag,rargs))::stack2 =>
+         SUBTREE(pos_a, NODE(tag,rev(v::rargs)))::stack2
+       | (SUBTREE v)::(START_PAREN _)::stack2 =>
          (SUBTREE v)::stack2
        | _ =>
          raise T.SyntaxError(pos, "Unexpected \")\" when stack is "^stack2str stack)
     )
   | step(stack, postoken as (pos,T.SPECIAL #"]")) =
     (case reduce_for_priority(infinitePrio,stack) of
-         (LIST_ACC vs)::stack2 =>
-         (SUBTREE(LIST(rev vs)))::stack2
-       | (SUBTREE v)::(LIST_ACC vs)::stack2 =>
-         (SUBTREE(LIST(rev(v::vs))))::stack2
+         (LIST_ACC(pos_a,vs))::stack2 =>
+         (SUBTREE(pos_a, LIST(rev vs)))::stack2
+       | (SUBTREE v)::(LIST_ACC(pos_a, vs))::stack2 =>
+         (SUBTREE(pos_a, LIST(rev(v::vs))))::stack2
        | _ =>
          raise T.SyntaxError(pos, "Unexpected \"]\" when stack is "^stack2str stack)
     )
-  | step(stack, postoken as (pos,T.SPECIAL #"}")) =
+  | step(stack, postoken as (pos_z,T.SPECIAL #"}")) =
     (case reduce_for_priority(infinitePrio,stack) of
-         START_CURLY::stack2 =>
-         (SUBTREE(NODE("{}",[])))::stack2
-       | (SUBTREE v)::START_CURLY::stack2 =>
-         (SUBTREE(NODE("{}",[v])))::stack2
+         (START_CURLY pos_a)::stack2 =>
+         (SUBTREE(pos_a,NODE("{}",[])))::stack2
+       | (SUBTREE v)::(START_CURLY pos_a)::stack2 =>
+         (SUBTREE(pos_a,NODE("{}",[v])))::stack2
        | _ =>
-         raise T.SyntaxError(pos, "Unexpected \"}\" when stack is "^stack2str stack)
+         raise T.SyntaxError(pos_z, "Unexpected \"}\" when stack is "^stack2str stack)
     )
   | step(stack, postoken as (pos,T.SPECIAL #",")) =
     (case reduce_for_priority(commaPrio,stack) of
-         (SUBTREE v)::(CTOR_COLLECTING_ARGS(tag,rargs))::stack2 =>
-         CTOR_COLLECTING_ARGS(tag,v::rargs)::stack2
-       | (SUBTREE v)::(LIST_ACC vs)::stack2 =>
-         LIST_ACC(v::vs)::stack2
+         (SUBTREE v)::(CTOR_COLLECTING_ARGS(pos_a,tag,rargs))::stack2 =>
+         CTOR_COLLECTING_ARGS(pos_a, tag, v::rargs)::stack2
+       | (SUBTREE v)::(LIST_ACC(pos_a,vs))::stack2 =>
+         LIST_ACC(pos_a, v::vs)::stack2
        | stack2 =>
          handle_infix_or_postfix(",",pos,synspec,stack2)
     )
-  | step(stack, (pos, T.SPECIAL #"(")) = START_PAREN::stack
-  | step(stack, (pos, T.SPECIAL #"[")) = (LIST_ACC [])::stack
-  | step(stack, (pos, T.SPECIAL #"{")) = START_CURLY::stack
-  | step(stack, (pos, T.INT v)) = (SUBTREE(INT v))::stack
-  | step(stack, (pos, T.STRINGLIT v)) = (SUBTREE(STRING v))::stack
-  | step(stack, (pos, T.WORD v)) = (CTOR_AWAITING_ARGS v)::stack
+  | step(stack, (pos, T.SPECIAL #"(")) = (START_PAREN pos)::stack
+  | step(stack, (pos, T.SPECIAL #"[")) = (LIST_ACC(pos, []))::stack
+  | step(stack, (pos, T.SPECIAL #"{")) = (START_CURLY pos)::stack
+  | step(stack, (pos, T.INT v)) = (SUBTREE(pos,INT v))::stack
+  | step(stack, (pos, T.STRINGLIT v)) = (SUBTREE(pos,STRING v))::stack
+  | step(stack, (pos, T.WORD v)) = (CTOR_AWAITING_ARGS(pos,v))::stack
   | step(stack, (pos, T.OP v)) = handle_op(stack, v, pos)
   | step(stack, (pos, T.SPECIAL v)) =
         raise T.SyntaxError(pos, "Unexpected \""^Char.toString v^"\" when stack is "^stack2str stack)

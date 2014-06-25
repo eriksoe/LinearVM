@@ -15,13 +15,17 @@ val synspec : P.Synspec =
      ("&",  (P.PREFIX, 200)),
      ("::", (P.INFIX_L,100))];
 
-fun parse_type(P.NODE("=>", [P.NODE(tyname,[]), body])) =
+fun parse_type(##, P.NODE("=>", [(_,P.NODE(tyname,[])), body])) =
     A.TYABS(tyname, parse_type body)
-  | parse_type(P.NODE(tyvar,[])) =
+  | parse_type(##, P.NODE(tyvar,[])) =
     A.NAMED_TYPE([tyvar])
 
-fun parse_form(P.NODE("typedef", [P.NODE(name,[]), def])) =
+fun parse_form(##, P.NODE("typedef", [(_,P.NODE(name,[])), def])) =
     A.TYPEDEF(name, parse_type def)
+  | parse_form(##, P.NODE(ctor, _)) =
+    raise T.SyntaxError(##, "Bad definition: "^ctor)
+  | parse_form(##, badnode) =
+    raise T.SyntaxError(##, "Bad definition")
 
 fun parse_string s =
     let
