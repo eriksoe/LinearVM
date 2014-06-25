@@ -31,7 +31,8 @@ fun lookup key [] = NONE
 
 fun cst2str(INT v) = "INT("^(Int.toString v)^")"
   | cst2str(STRING v) = "STRING("^v^")"
-  | cst2str(NODE(tag,children)) = tag^"("^(String.concat (map cst2str children))^")"
+  | cst2str(NODE(tag,children)) = tag^"("^(String.concatWith ", " (map cst2str children))^")"
+  | cst2str(LIST vs) = "["^(String.concatWith "," (map cst2str vs))^"]"
 
 fun stack2str([]) = "Stack is empty.\n"
   | stack2str([SUBTREE v]) = "Stack has one element: "^cst2str v^"\n"
