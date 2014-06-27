@@ -9,6 +9,8 @@ use "DescribeSML/src/expect.sml";
 
 use "parser_test.sml";
 
+use "hashmap_test.sml";
+
 use "asm_ast.sml";
 use "asmparser.sml";
 use "asmparser_test.sml";
