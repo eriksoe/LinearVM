@@ -1,0 +1,211 @@
+\documentclass[a4paper]{book}
+
+\begin{document}
+
+\tableofcontents
+\part{}
+
+\section{Introduction}
+
+\subsection{Background}
+% * The gap - platforms lacking proper concurrency guarantees
+%   vs. BEAM which is concurrency-first but pays perhaps too much
+%   - poor in destructive updates / ephemeral data structures.
+% * C++ and "safe" patterns (esp. regarding smart pointers);
+%   "A virtual machine for C++"
+% * Library/API documentation (, state of): names & types
+%   but always not lifecycle and threading constraints.
+
+
+\subsection{What is LinearVM?}
+% An interface - in the form of a program representation
+% and well-formedness criteria providing certain guarantees.
+
+\section{Design philosophy}
+
+\subsection{Priorities}
+
+The design priorities are, in order from most important to less important:
+
+\begin{itemize}
+\item Safety (type and concurrency)
+\item Flexibility
+\item Simplicity
+\item Performance (cheapness in space and time).
+\end{itemize}
+
+\subsubsection*{Safety}
+Safety is paramount. The only (lamentable) exception is the
+necessary support for using native libraries, i.e. having a Foreign
+Function Interface (FFI). Ideally, development tools should provide
+good support for stress testing FFI bindings.
+
+\subsubsection*{Flexibility}
+It should be easy to model a wide variety of languages and paradigms on the
+virtual machine -- to the extent, of course, that the features to be modelled
+are type and concurrency safe.
+Furthermore, since it's still early days and there's little
+experience with using linear types to implement real systems,
+we have no desire to fix decisions prematurely.
+
+\subsubsection*{Simplicity}
+Quoth Dijkstra, ``Simplicity is prerequisite for reliability''.
+Quoth Sessions paraphrasing Einstein: ``Everything should be as
+simple as it can be but not simpler''.
+Given the constraints set down by safety and flexibility, we strive
+for simplicity. This is a fine balance.
+
+One core source of simplicity is following the ``provide mechanism
+rather than policy'' design rule: Including the general principles in
+the VM, but leaving specific details to be added on top of it later.
+
+\subsubsection*{Performance}
+Speed and compactness are not primary goals. We believe that with the
+right basis, and suitably strong code invariants, fast execution can
+come later. (Even Javascript has been pushed far these days.)
+
+If the above design priorities mean that program details get more explicit
+(e.g. involve more steps),
+then so be it -- at least as long as it's no worse than a constant factor.
+(This overhead is akin to that of proof-carrying code [TODO: link]).
+
+
+\subsection{Still early days/Core business}
+As mentioned, there's little experience with linearly typed systems in
+practice.
+
+A theme which may become recurrent is that a design decision will be
+resolved with ``we don't know enough about the real-world uses of this
+yet -- so we'll effectively delay this decision by providing a suitably
+general mechanism.''
+
+Once some experience has been gained, and the real-world uses are
+better understood, such design decisions may be revisited.
+
+
+\section{Requirements}
+The virtual machine should have a type system which
+enforces type safety and safety against data races.
+%Deadlock prevention may also be added, although that is less certain
+%at this point.
+
+The type system should be enforced by a bytecode verifier.
+
+In order to be of practical use, the VM should have a FFI (foreign
+function interface).  This is of course in itself a compromisation of
+type integrity and so forth, but it appears to be a practical necessity
+-- all VMs
+in practical use have it.  The linear type system would presumably
+support FFI better than most other mechanisms, given that linear types are good at
+describing management of resources such as entities provided by
+foreign libraries.
+
+\section{Design basics}
+% All values are linear at the outset
+% I.e. copying & disposal are explicit
+% Consequences for exceptions
+
+In the following, we sketch the most immediate consequences of the
+requirements and priorities.
+
+Design decisions tend to interact.
+The following is a list of choices, approximately ordered by scope and
+implications (wider and more basic decisions first).
+
+\subsection{Linear types}
+Firstly, supporting the combination of data race safety and imperative
+paradigms leads to the use of linear types.
+
+Modelling certain things in a concurrency-safe way becomes a great deal simpler
+once you use linear types.
+Choosing to support on linear types, and to rely on them for enforcing
+certain invariants, is the basic design decision which makes LinearVM
+stand apart.
+
+Design decisions often interact with each other; this basic design choice
+influences most other aspects of the VM design.
+
+But should all values be regarded as linear, or only certain types? Numbers,
+for instance, can be copied and destroyed without any special action.
+
+We decide to treat all values as linear, for the following reasons:
+\begin{itemize}
+\item Non-linear types can easily be built on top of linear ones, by adding
+  the trivial ``copy'' and ``dispose'' operations.
+\item While number types which fit into the underlying machine's registers
+  can be copied and destroyed without any special action, because they
+  don't involve any external resources, the same is not true of
+  e.g. ``bigints'' which involve some allocated memory.
+  Thus, some number types are more linear-ish than others.
+\item By treating all values as linear, we'll learn faster how to cope with
+  different patterns of access and manipulation of linear values, and
+  make them work for as wide a range of circumstances as the case allows.
+\item Finally, there is simplicity in not having to deal with two
+  kinds of values.
+\end{itemize}
+
+Thus, not only do we choose to support linear types -- we make them the
+norm; in essence, all types are linear, and copying and destroying of values
+is only possible if explicitly allowed.
+
+\subsection{Layering}
+The bytecode-verification algorithm is central to this project.
+For security and robustness, it should be made as simple as the
+typing rules allow -- yet flexible enough, of course, for real-world
+programs.
+
+What is least likely to change? The type system and typing rules, the
+set of primitive types, or the set of operations on values?
+
+The type system and its typing rules are presumably the most stable of
+these three -- the most timeless part. Both the set of concrete types
+and the set operations may well evolve over time.
+
+Therefore, the type system and its verification algorithm is regarded
+as the most fundamental component. Further up on the stack are the set
+of types and further up yet the set of operations. These are less
+fundamental to the degree that they're not actually fixed by the core
+LinearVM design.
+
+This serves two purposes which can be characterised as simplicity and flexibility:
+Firstly, it simplifies the verifier, in that it does not need to incorporate
+knowledge of all the primitve types and all the operations on them.
+Secondly, it gives flexibility: the set of primitive types can be adjusted
+more easily.
+This design choice follows the separation design principle of ``mechanism,
+not policy'' which reflects that it is beneficial to arrange software so
+that stable, general parts are lower in the stack than parts which are
+more specific and more prone to change.
+
+Note that this architecture, in which the verification algorithm is
+more or less ignorant about the concrete types and operations,
+is in contrast to e.g. the JVM and CLR designs, in which the
+byte-code verifier has hard-coded knowledge of a set of primitive types
+and certain operations on them.
+
+\subsection{Exceptions}
+
+Linear types and exceptions don't play well together.
+For standard exception propagation to work, one must assume that
+all stack frames -- and therefore all values -- can be disposed of at will.
+That is not the case, however, for linear values.
+
+One might think up complex approximations to exception propagation.
+In LinearVM, however, we take the simple solution:\footnote{
+At least for the present. If experience shows that there are patterns to how exceptions are handled, then that might be supported more directly at a later point.}
+At the VM level, \emph{exceptions do not exist} -- although they can be added on
+a higher level of abstraction.
+(This is quite like, at the level of physical processors, there is no
+``exception'' concept.)
+
+Operations which can either complete succesfully or terminate exceptionally
+will be modelled using functions with \emph{multiple exits}.
+
+\subsection{Multiple function exits}
+
+
+\part{Implementation}
+
+
+
+\end{document}
