@@ -3,6 +3,9 @@
 \newcommand\arity{{\ensuremath\textit{arity}}}
 \newcommand\fixedsize{{\ensuremath\textit{fixed\_size}}}
 
+%\newcommand\max{{\ensuremath\textit{max}}}
+\newcommand\implies{\;\Longrightarrow\;}
+
 % Type constructors:
 \newcommand\tyImport{{\ensuremath\textit{import}}}
 \newcommand\tyVar{{\ensuremath\textit{var}}}
@@ -10,6 +13,11 @@
 \newcommand\tyBless{{\ensuremath\textit{bless}}}
 \newcommand\tyCurse{{\ensuremath\textit{curse}}}
 \newcommand\tyPtr{{\ensuremath\textit{ptr}}}
+\newcommand\tyPad{{\ensuremath\textit{pad}}}
+\newcommand\tyRecord{{\ensuremath\textit{record}}}
+\newcommand\tyVariant{{\ensuremath\textit{variant}}}
+
+\newcommand\tyVoid{{\ensuremath\textit{void}}}
 
 \begin{document}
 
@@ -28,17 +36,18 @@ an \emph{arity} property which tells the depth of its free variables.
 $$
 \arity(T) : int
 $$
-Type variables are not named, but specified by their de Bruijn indices.
+In the binary file format, type variables are not named, but specified
+by their de Bruijn indices.
 
 \subsection{Assignability}
 Central to the type rules are the restrictions of value movements,
 which are governed by \emph{assignability}:
 $$
-T_{\it destination} := T_{\it sourceff}
+T_{\it destination} := T_{\it source}
 $$
 
 Assignability is reflexive:
-$$T := T$$c
+$$T := T$$
 
 \subsection{Fixed-size}
 While polymorphic types are supported, the representation size of values
@@ -47,6 +56,11 @@ determinable at load time).
 The type property \emph{fixed\_size} tells whether this is the case.
 $$
 \fixedsize(T)
+$$
+
+It is always the case that
+$$
+\arity(T) = 0 \implies \fixedsize(T)
 $$
 
 \section{Type constructors}
@@ -61,9 +75,12 @@ $$
 $$
 At load time, it is verified that
 \begin{itemize}
+\item the imported type exists, exported with $\arity_{\it export}$
+  and $view\_type_{\it export}$
 \item the arities match: $\arity_{\it export} = \arity_{\it import}$
 \item the view types match:\\
-$view\_type_{\it export} = view\_type_{\it import} \;\lor\; view\_type_{\it import} = opaque$
+$view\_type_{\it import} = view\_type_{\it export} \;\lor\; view\_type_{\it import} = opaque$
+\item the view type matches the arity: $\arity(view\_type_{\it import}) \le \arity_{\it import}$
 % TODO: This might be generalized. These special cases are safe.
 \end{itemize}
 
@@ -101,7 +118,7 @@ $$
 \it type ::= \tyApp(type : type, arg : type)
 $$
 \subsubsection*{Properties}
-$$ \arity(\tyApp(t,a)) = max(\arity(t)-1, \arity(a)) $$
+$$ \arity(\tyApp(t,a)) = \max(\arity(t)-1, \arity(a)) $$
 
 \subsection{Recursive type application}
 \subsection{Universal quantification}
@@ -115,10 +132,16 @@ $$ \arity(\exists(t)) = \arity(t)-1 $$
 
 $${s \textrm{ is any type}} \over \exists(t) := t(s)$$
 
+$$\fixedsize(t) \over \fixedsize(\exists(t))$$
 
-\subsection{Cursing}
+\subsection{Tagging}
+\emph{Tagging} is a type encapsulation/subtyping mechanism.
+It comes in two flavours: \emph{cursing} and \emph{blessing}.
+
+\subsubsection{Cursing}
 \emph{Cursing} is a type encapsulation/subtyping mechanism.
-It is a way of marking that a type is restricted in its use.
+Covariantly, it is a way of marking that a type is restricted in its use.
+Contravariantly, it is a way of marking that a given restriction does not apply.
 $$
 \it type ::= \tyCurse(name : qsymbol, args : type\_tag\_arg^*, type : type)
 $$
@@ -128,13 +151,19 @@ $$
 
 \subsubsection*{Properties}
 $$
+\arity(\tyCurse(n,a,t)) = \max(\arity(t), \max_{t' \in a} \arity(t'))
+$$
+$$
 \tyCurse(n,a,t) := t
 $$
 
-\subsection{Blessing}
+$$\fixedsize(t) \over \tyCurse(n,a,t)$$
+
+\subsubsection{Blessing}
 \emph{Blessing} is a subtyping mechanism.
-It is a way of marking that a type can be used in an extended set of
-circumstances.
+Covariantly, it is a way of marking that a type can be used in an
+extended set of circumstances.
+Contravariantly, it is a way of marking that a given blessing is required.
 
 $$
 \it type ::= \tyBless(name : qsymbol, args : type\_tag\_arg^*, type : type)
@@ -142,22 +171,90 @@ $$
 
 \subsubsection*{Properties}
 $$
+\arity(\tyBless(n,a,t)) = \max(\arity(t), \max_{t' \in a} \arity(t'))
+$$
+$$
 t := \tyBless(n,a,t)
 $$
 
+$$\fixedsize(t) \over \fixedsize(\tyBless(n,a,t))$$
+
 \subsection{Pointers}
 The purpose of pointer types is to represent data structures of variable length
-in a fixed-length field.
+in a fixed-size field.
 Pointers have no ``null''-like value. Pointer types should in practise
-always be used in association with a particular memory management
+always be used in association with a specification of a memory management
 policy.
 
 $$\it type ::= \tyPtr(type : type)$$
 
 \subsubsection*{Properties}
-$$ \arity(ptr(t)) = \arity(t)$$
+$$ \arity(\tyPtr(t)) = \arity(t)$$
 
 All pointer types are fixed-size.
-$$\fixedsize(ptr(t))$$
+$$\fixedsize(\tyPtr(t))$$
+
+\subsection{Padding}
+At times it is necessary or convenient to ensure that a field's size is
+(physically) large enough to accommodate all of a set of types.
+
+$$\it type ::= \tyPad(type : type, pad\_type : type)$$
+
+Padding is used in conjunction with pointers, existential types,
+and types with lifecycles.
+
+\subsubsection*{Remarks}
+An $n$-ary version of $\tyPad$ can be had through nesting:
+$$\tyPad(t, \tyPad(t_{pad1}, t_{pad2}))$$
+
+\noindent
+% For all intents and purposes, ...
+Intuitively, the following equivalenses hold:
+
+\begin{itemize}
+\item Commutativity of padding types:
+$$\tyPad(t, \tyPad(t_{pad1}, t_{pad2})) \equiv
+  \tyPad(t, \tyPad(t_{pad2}, t_{pad1}))$$
+
+\item Associativity of padding types:
+$$\tyPad(t, \tyPad(t_{pad1}, \tyPad(t_{pad2}, t_{pad3}))) \equiv
+\tyPad(t, \tyPad(t_{pad2}, \tyPad(t_{pad1}, t_{pad3})))$$
+
+\item $\tyVoid$ as a neutral element:
+$$\tyPad(t, \tyVoid) \equiv t$$
+
+\end{itemize}
+
+\subsubsection*{Properties}
+$$ \arity(\tyPad(t, t')) = \max(\arity(t), \arity(t'))$$
+
+
+$${\fixedsize(t) \qquad \fixedsize(t')}
+ \over
+\fixedsize(\tyPad(t, t'))$$
+
+\subsection{Records}
+Record types describe conjunctions of types -- the simultaneous
+existence of multiple values (of similar or different types).
+
+$$\it type ::= \tyRecord(fields : field^*)$$
+$$\it field ::= \{name:symbol, type:type\}$$
+
+The field names must be distinct.
+
+\subsubsection*{Properties}
+
+$$
+\arity(\tyRecord({\it fields})) = \max_{f \in {\it fields}}(\arity(f.{\it type}))
+$$
+
+
+A record type is fixed-size when all of its fields are.
+$${\forall f \in {\it fields} : \fixedsize(f.{\it type})} \over
+  \fixedsize(\tyRecord({\it fields}))
+$$
+
+\subsection{Variants}
+\subsubsection*{Properties}
 
 \end{document}
