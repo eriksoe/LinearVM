@@ -24,6 +24,25 @@
 \chapter{Type system}
 \label{chap:typesystem}
 
+\section{Overview}
+All primitive types in LinearVM are not listed or described
+in the type system proper; they are treated as imported types.
+
+All composite types, however, are constructed using the set of
+\emph{type constructors} of the type system.
+
+The type constructors belong roughly to the following groups:
+\begin{description}
+\item[Importing] For linking, and for access to primitive types.
+\item[Product and sum types] The bread and butter of type construction.
+\item[Genericity] Type variables and their supporting constructs.
+\item[Tagging] A mechanism which supports creating custom sub- and
+  supertypes of any given type, and also describing certain relations
+  between different values.
+\item[Memory] Pointers and padding.
+\end{description}
+
+
 \section{Type properties}
 
 The type rules make use of certain type properties associated with each type.
@@ -240,7 +259,7 @@ existence of multiple values (of similar or different types).
 $$\it type ::= \tyRecord(fields : field^*)$$
 $$\it field ::= \{name:symbol, type:type\}$$
 
-The field names must be distinct.
+The field names must be distinct within a record type.
 
 \subsubsection*{Properties}
 
@@ -255,6 +274,24 @@ $${\forall f \in {\it fields} : \fixedsize(f.{\it type})} \over
 $$
 
 \subsection{Variants}
+Variant types describe disjunctions of types -- the
+existence of a value of exactly one of multiple (similar or different) types.
+
+$$\it type ::= \tyVar(flavours : flavour^*)$$
+$$\it flavour ::= \{name:symbol, type:type\}$$
+
+The flavour names must be distinct within a variant type.
+
 \subsubsection*{Properties}
+
+$$
+\arity(\tyVar({\it flavours})) = \max_{f \in {\it flavours}}(\arity(f.{\it type}))
+$$
+
+
+A variant type is fixed-size when all of its fields are.
+$${\forall f \in {\it flavours} : \fixedsize(f.{\it type})} \over
+  \fixedsize(\tyVar({\it flavours}))
+$$
 
 \end{document}
