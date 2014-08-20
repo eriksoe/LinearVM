@@ -1,6 +1,11 @@
 \documentclass[a4paper]{report}
+\usepackage[latin1]{inputenc}
+\usepackage[T1]{fontenc}
 
 \begin{document}
+
+\tableofcontents
+
 \chapter{Introduction}
 This specification defines the ``LinearVM'' abstract machine.
 
@@ -78,9 +83,20 @@ The design of LinearVM follows the design philosophy of ``mechanism, not policy'
 
 % Defers decisions
 
+\section{Outline}
+The rest of this text is structured as follows:
+
+In chapter \ref{ch:execution}, the architecture and execution model of
+the abstract machine is described.
+
+Chapter \ref{ch:types} describes the type system.
+
+Chapter \ref{ch:fileformat} describes the LinearVM file format.
+
 
 
 \chapter{Program Executor}
+\label{ch:execution}
 
 The program executor of a LinearVM system is the core of the abstract machine.
 It is register-based and function-based, and has a quite small instruction set.
@@ -128,21 +144,97 @@ The machine's instruction set consists of the following instructions:
 \item[Label] -- marks a point in the instruction stream.
 \end{description}
 
+The individual instructions are described in more detail in the following.
 
+It is assumed that the instructions occur within a function of type
+$$
+(in_1, \ldots, in_n) -> (out_1, \ldots, out_{m_1}) \;|\; (out_1, \ldots, out_{m_2}) \;|\; \ldots \;|\; (out_1, \ldots, out_{m_k})
+$$
 
+\subsection{The Load instruction}
+%% Short description:
+The instruction
+$$
+\texttt{load } c, r
+$$
+stores into the register $r$ the constant $c$.
+%% TODO: Long description.
 
-
-\chapter{File format}
+\subsection{The Return instruction}
+%% Short description:
+The instruction
+$$
+\texttt{return } rp\; (r_1, \ldots, r_n)
+$$
+returns via the return path $rp$, with return values $r_1, \ldots, r_n$.
 
-\section{File encoding}
+\paragraph{Preconditions:}
+The arity of the return path $rp$ is $n$.
+For $i \in 1 \ldots n$, the type of $r_i$ is assignable to the $i$th return
+value type of $rp$.
+For $i \in 1 \ldots n$, the value in $r_i$ is spendable.
+value type of $rp$.
+The set of available and spendable registers are precisely $\{r_i | i \in 1 \ldots n\}$.
 
+\subsection{The Call instruction}
+%% Short description:
+The instruction
+$$
+\texttt{call } f\; (r_{io_1}, \ldots, r_{io_p});(r_{in_1}, \ldots, r_{in_n})
+\rightarrow(r_{{out0}_1}, \ldots, r_{{out0}_{m_0}})
+rp_1 (r_{{out1}_1}, \ldots, r_{{out1}_{m_1}})
+\ldots
+rp_k (r_{{outk}_1}, \ldots, r_{{outk}_{m_k}})
+$$
+calls the function $f$ with arguments from registers $r_{inout_1}, \ldots, r_{inout_p}$ and $r_{in_1}, \ldots, r_{in_n}$.
+A number $k$ of alternative return paths are available to the called function;
+$rp_i$ is the corresponding return label and
+$r_{{outi}_1}, \ldots, r_{{outi}_{m_i}}$ the registers in which the
+result values are placed before execution resumes at the return label.
+$rp_0$ is implicit: it is the instruction following the call instruction.
 
+\paragraph{Preconditions:}
+Let $A$ be the set of occupied registers, and $S$ the set of
+spendable registers.\\
+Let $IO = \{r_{io_i} | i \in 1 \ldots p\}$.\\
+Let $I = \{r_{in_i} | i \in 1 \ldots n\}$.\\
+Let $O_j = \{r_{out j_i} | i \in 1 \ldots m_j\}$.\\
 
-\section{File sections}
+Then,
+\begin{itemize}
+\item all the inputs are distinct registers: $IO \cap I = \emptyset$, $|IO|=p$, $|I|=n$;
+\item all the outputs are distinct registers: $\forall j: |O_j| = m_j$;
+\item all the inputs are occupied: $(IO \cup I) \subseteq A$;
+\item all the spent inputs are spendable: $I \subseteq S$;
+\item all the output registers are empty at return time: $\forall j: O_j \cap (A \setminus I) = \emptyset$.
+\end{itemize}
+
+$S'_j := (S \setminus I) \cup O_j$.
+
+%% TODO: Long description.
+
+\subsection{The Label instruction}
+%% Short description:
+The instruction
+$$
+\texttt{label }\textit{name}
+$$
+marks the code position as label $\textit{name}$.
 
 
 
 \chapter{Type System}
+\label{ch:types}
+
+\section{Terminology}
+
+\begin{description}
+\item[Ground type] A type which has no free type variables.
+\item[Arity of a type] ($\mathit{arity}(T)$) The highest level of its free variables.
+  Equal to the number of times the type would have to be
+  subject to type application for it to become a ground type.
+\item[Known-size type] A type which has a known run-time representation size.
+\end{description}
 
 \section{Type kinds}
 
@@ -151,9 +243,18 @@ Types imported from other modules. These are opaque types from the
 importing module's point of view.
 $$ \mathit{import(name, arity)} $$
 
+$\mathit{arity}(T) = \mathit{arity}$\\
+$\mathit{known\_size}(T) = (arity=0) \lor ??$\\
+
+%% TODO: It would be nice to be able to export structs etc., non- or
+%% semi-opaquely - but that requires a bit of thought to get right.
+
 \subsection{Product types (records)}
 $$ \mathit{product((symbol_1, type_1), \ldots, (symbol_n, type_n))} $$
 $$ t_1 \otimes t_2 \otimes \ldots \otimes t_n $$
+
+$\mathit{arity}(T) = \max_{i=1}^{n}{arity(t_i)}$\\
+$\mathit{known\_size}(T) = \left\land_{i=1}^{n} \mathit{known\_size(t_i)}$\\
 
 %% Re. operations: mention export trick (exported field ref splitter returns record of access rights to each relevant field; with suitable (guaranteed?) representation optimations, this virtual record gives no overhead.)
 
@@ -161,23 +262,43 @@ $$ t_1 \otimes t_2 \otimes \ldots \otimes t_n $$
 $$ \mathit{sum((symbol_1, type_1), \ldots, (symbol_n, type_n))} $$
 $$ t_1 \oplus t_2 \oplus \ldots \oplus t_n $$
 
+$\mathit{arity}(T) = \max_{i=1}^{n}{arity(t_i)}$\\
+$\mathit{known\_size}(T) = \left\land_{i=1}^{n} \mathit{known\_size(t_i)}$\\
+
 \subsection{Vtable types}
 $$ \mathit{vtable(parent, sig_1, \ldots, sig_n)} $$
 $$ sig_1! \otimes sig_2! \otimes \ldots \otimes sig_n! $$
 %% TODO: Where to put the '!' ? Prefix or suffix?
 
+$\mathit{arity}(T) = \max(\mathit{arity}(parent), \max_{i=1}^{n}{arity(sig_i)})$\\
+$\mathit{known\_size}(T) = \top$\\
+
+\subsection{Pointer types}
+
+$\mathit{known\_size}(T) = \top$\\
+
 \subsection{Type variables}
 Type variables are encoded using de Bruijn indices.
 $$ \mathit{var(i)} $$
 
+$\mathit{arity}(T) = i$\\
+$\mathit{known\_size}(T) = \bot$\\
+
 \subsection{Type application}
 $$ \mathit{apply(type_{abs},type_{arg})} $$
 
+$\mathit{arity}(T) = \max(\mathit{arity}(type_{abs}) - 1, \mathit{arity}(type_{arg}))$
+
 \subsection{Existential types}
+%  TODO: Add size of existential parameter
 $$ \mathit{\exists(type)} $$
+
+$\mathit{arity}(T) = \mathit{arity}(type) - 1$
 
 \subsection{Recursive types (letrec)}
 $$ \mathit{letrec(type_1, \ldots, type_n)} $$
+
+$\mathit{arity}(T) = (\max_{i=1}^{n}{arity(type_i)}) - n$
 
 \subsection{Symbolic types (tags)}
 
@@ -201,6 +322,101 @@ Is equivalent to the empty record.
 
 
 
+
+
+\chapter{File format}
+\label{ch:fileformat}
+
+\section{File encoding}
+
+\section{File sections}
+% TOC: (<section-id:32> <start-offset:32>)* ; section-id=0 markerer slut.
+
+\begin{tabular}{ll}
+\hline
+\hline
+Identifier & Section contents\\
+\hline
+\tt SymS & Symbol source\\        %
+\tt Symb & Symbols\\              % -> SSrc
+\tt Name & Names\\                % -> Symb
+
+\tt TImp & Imported types\\       % -> Name
+\tt FImp & Imported functions\\   % -> FSig
+
+\tt Type & Type definitions\\     % -> TImp + Symb
+\tt FSig & Function signatures\\  % -> Type
+\tt FunD & Function declarations\\ % -> FSig + Symb + Cnst
+% TODO: VTables
+\tt CstS & Constant pool source\\ %
+\tt CDec & Constant decoders\\    % -> FImp + ?
+\tt Cnst & Constants\\            % -> CBin+CDec
+
+\tt Func & Function definitions\\ % -> FSig + Symb + Cnst
+\tt TExp & Exported types\\       % -> Symb + Type
+\tt FExp & Exported functions\\   % -> Symb + FSig
+\hline
+\hline
+\end{tabular}
+% TODO: Function declarations vs. definitions -- How to represent it?
+% Logically,
+% Function declaration -> name + signature + provider + details
+
+
+\subsection{Symbol source}
+The Symbol Source section is a binary section, consisting of UTF-8 encoded unicode characters.
+
+\paragraph{Requirements:}
+\begin{enumerate}
+\item The entire section is a sequence of valid UTF-8-encoded characters.
+\end{enumerate}
+
+\subsection{Symbols}
+The Symbols section is a number-sequence section. It defines a set of
+symbols, numbered $1 \ldots n_{symbols}$.
+The following $n_{symbols}$ numbers are the lengths, in bytes, of the symbols.
+\begin{quote}
+  \texttt{Symb} ::= <$n_{symbols}$> <$symbol\_length$>[1 \ldots $n_{symbols}$]
+\end{quote}
+
+\paragraph{Interpretation:}
+The $i$th symbol is defined as the substring of the Symbols Source section
+which begins at offset $\sum_{j=1}^{i-1} {symbol\_length_{j}}$
+and ends at offset $\sum_{j=1}^{i} {symbol\_length_{j}}$.
+
+\paragraph{Requirements:}
+\begin{enumerate}
+\item The section contains exactly $1 + n_{symbols}$ numbers.
+\item The symbol lengths sum up to the length (in bytes) of the Symbol Source section.
+\item The $i$th symbol is a valid UTF-8 string.
+\end{enumerate}
+
+\subsection{Names}
+The Names section is a number-sequence section.
+It defines a set of names, numbered $1 \ldots n_{names}$.
+The following $2 \cdot n_{names}$ numbers are pairs $(parent\_name, symbol)$ of indices.
+
+\begin{quote}
+  \texttt{Symb} ::= <$n_{names}$> <$name$>[1 \ldots $n_{names}$]\\
+  \texttt{<name>} ::= <$parent\_name$> <$symbol$>
+\end{quote}
+
+\paragraph{Interpretation:}
+Names are sequences of symbols, conventionally written with periods as
+separators. The names form a hierarchy: names with $parent\_name = 0$
+are roots, consisting only of the single symbol $symbol$; names with
+$parent\_name > 0$ are interpreted as the symbol sequence of the
+parent name followed by the $symbol$.
+
+\paragraph{Requirements:}
+\begin{enumerate}
+\item The section contains exactly $1 + 2 \cdot n_{names}$ numbers.
+\item For all $i \in [1;n_{names}]$: $0 \le name_i.parent\_name < i$.
+\item For all $i \in [1;n_{names}]$: $1 \le name_i.symbol \le n_{symbols}$.
+\end{enumerate}
+
+
+
 \chapter{Misc}
 
 \section{Suggested representation optimizations}
@@ -217,5 +433,6 @@ Is equivalent to the empty record.
 \item Variant types of which exactly one variant is data bearing (of type T), and which have at most 256 other variants, are represented as either a pointer to type T, or as an integer in $[0;255]$.
 \item Variant types of which at most 4 variants are data bearing (of type $T_0\ldots T_3$), and which have at most 256 other variants, are represented as either a pointer to type T, tagged in the lowest two bits with $i$, or as an integer in $[0;255]$.
 \end{itemize}
+
 
 \end{document}
