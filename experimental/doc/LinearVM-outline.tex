@@ -1,5 +1,18 @@
 \documentclass[a4paper]{book}
 
+% Type constructors:
+\newcommand\tyImport{{\ensuremath\textit{import}}}
+\newcommand\tyVar{{\ensuremath\textit{var}}}
+\newcommand\tyApp{{\ensuremath\textit{app}}}
+\newcommand\tyBless{{\ensuremath\textit{bless}}}
+\newcommand\tyCurse{{\ensuremath\textit{curse}}}
+\newcommand\tyPtr{{\ensuremath\textit{ptr}}}
+\newcommand\tyPad{{\ensuremath\textit{pad}}}
+\newcommand\tyRecord{{\ensuremath\textit{record}}}
+\newcommand\tyVariant{{\ensuremath\textit{variant}}}
+
+\newcommand\tyVoid{{\ensuremath\textit{void}}}
+
 \begin{document}
 
 \tableofcontents
@@ -221,15 +234,94 @@ will be modelled using functions with \emph{multiple exits}.
 \part{Types and Operations}
 
 \chapter{Introduction}
+\chapter{Small constructed types}
+
+\section{Void}
+``Void'' (\texttt{linearvm.basis.void}) is the unit type.
+It is defined as the record type with no fields:
+\begin{center}
+  \verb|record {}|
+\end{center}
+The official name is just an alias.
+
+Void is special in two respects:
+\begin{enumerate}
+\item it can be represented in zero bits;
+  it is therefore not necessary to allocate space for void values at
+  runtime, which means that they are in a sense ``free''.
+  For this reason, void and derivatives (by $\tyBless$ and
+  $\tyCurse$) are at times used to represent proofs and obligations.
+\item it is trivial to construct and dispose of;
+  it is therefore used (in conjunction with $\tyPad$) to represent e.g.
+  uninitialized or emptied fields.
+\end{enumerate}
+
+Note that void is not usually used as a return type: there is a
+difference between returning void (a record value with zero fields)
+and returning zero values.
+
+\section{Never}
+``Never'' (\texttt{linearvm.basis.never}) is the bottom type.
+It is defined as the variant type with no flavours:
+\begin{center}
+  \verb|variant {}|
+\end{center}
+The official name is just an alias.
+
+Never is special in that a value of this type can not be constructed.
+Function calls which have never as their first return value for some return
+path are treated specially by the verifier: it assumes that the return
+path in question will never be taken, and disregards that return edge
+in the control-flow graph.
+This is used in connection with the ``goto'' (\texttt{linearvm.basis.goto()})
+pseudo-instruction.
+
+\section{Boolean}
+``Boolean'' (\texttt{linearvm.basis.boolean}) is the type of truth values.
+It is defined as
+\begin{center}
+  \verb|variant {false: void, true: void}|
+\end{center}
+\subsection*{Operations}
+
+\begin{itemize}
+\item \texttt{and : (boolean,boolean) $\to$ boolean }
+\item \texttt{or : (boolean,boolean) $\to$ boolean }
+\item \texttt{not : (boolean) $\to$ boolean }
+\item \texttt{if : (boolean) $\to$ void $|$ void }
+  \\ This is equivalent to an ordinary ``case''
+  (\texttt{linearvm.variant.case}) on the variant type.
+\end{itemize}
+
+
+% Void
+% Bottom/never
+% Boolean
 \chapter{Integer types}
 \chapter{Floating-point types}
 \chapter{Bytestrings}
 \chapter{Strings}
 \chapter{Arrays}
 \chapter{Records}
+% create, fetch, store, borrow, deconstruct
+
 \chapter{Variants}
+\chapter{VTables}
+% call_<F> : (vtable(\{\ldots, f: (a_1, \ldots a_n) -> o_1 \| \ldots \| o_m),
+%            a_1, \ldots a_n) -> o_1 \| \ldots \| o_m.
+% dispose: vtable(\ldots) -> ()
+\chapter{Existentials}
+% create : (T) -> (\tyExist(v,T)) when ...?
+
+\chapter{Pointers}
+% store: (T, ptr(pad(void, T))) -> ptr(T)
+% fetch: ptr(T) -> (T, ptr(pad(void, T))) %% TODO: How to make work for different kinds of pointer?
+% - ptr(V, T) ?
+
 \chapter{Memory allocation}
 
+% malloc: () -> bless(mallocated, ptr(pad(void, T)))
+% free: bless(mallocated, ptr(pad(void, T))) -> ()
 
 
 \part{File Format}
