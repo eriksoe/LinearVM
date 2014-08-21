@@ -4,6 +4,7 @@
 \newcommand\tyImport{{\ensuremath\textit{import}}}
 \newcommand\tyVar{{\ensuremath\textit{var}}}
 \newcommand\tyApp{{\ensuremath\textit{app}}}
+\newcommand\tyBorrow{{\ensuremath\textit{borrow}}}
 \newcommand\tyBless{{\ensuremath\textit{bless}}}
 \newcommand\tyCurse{{\ensuremath\textit{curse}}}
 \newcommand\tyPtr{{\ensuremath\textit{ptr}}}
@@ -301,6 +302,14 @@ It is defined as
 \chapter{Floating-point types}
 \chapter{Bytestrings}
 \chapter{Strings}
+\chapter{Borrowing}
+% Two types of borrowing: shared (read-only) and exclusive (read-write).
+
+% These aren't final:
+% borrow : T -> exists(ID): (curse(borrowed, <ID>, T), borrowed(<ID>, T))
+% borrow_ro : T -> exists(ID): (curse(borrowed_ro, <ID>, T), borrowed(<ID>, curse(read_only, T)))
+% breturn : all(ID): (curse(borrowee, <ID>, T), borrowed(<ID>, T)) -> T
+
 \chapter{Arrays}
 \chapter{Records}
 % create, fetch, store, borrow, deconstruct
@@ -325,8 +334,82 @@ It is defined as
 
 
 \part{File Format}
+
 \part{Implementation}
 
+\section{Types with special treatment}
+% TODO: where to place this? Never-like types is a verifier thing; void-like types is mostly an implementation thing
 
+Certain types are handled specially by the verifier or at runtime.
+
+\subsection{Void and void-like}
+\emph{Void-like} types are certain types whose values can be
+represented in zero bits.
+They are defined as follows:
+
+{
+%\def\voidlike #1{{\ensuremath\textsf{void-like}(#1)}}
+\def\voidlike #1{\ensuremath{#1\ \textsf{void-like}}}
+\begin{tabular}{cc}
+\\
+$\voidlike{\tyRecord\{\}}$
+& ${\voidlike{T}} \over {\voidlike{\tyBless(\_, \_, T)}}$
+\\
+\\
+${\forall i : \voidlike{T_i}} \over {\voidlike{\tyRecord\{f_1 : T_1, \ldots, f_n : T_n\}}}$
+& ${\voidlike{T}} \over {\voidlike{\tyCurse(\_, \_, T)}}$
+\\
+\\
+${\voidlike{T}} \over {\voidlike{\tyBorrow(\_,T)}}$
+\\
+\\
+\end{tabular}
+
+Since these types only contain one value, it is not necessary to
+allocate space for void values at runtime, and void-like values are
+not present at runtime.
+The value's part has been played out at verification time, where it
+contributed with its type.
+
+\subsection{Never and never-like}
+
+\emph{Never-like} types are certain types which contain no values at all.
+They are defined as follows:
+
+{
+%\def\neverlike #1{{\ensuremath\textsf{never-like}(#1)}}
+\def\neverlike #1{\ensuremath{#1\ \textsf{never-like}}}
+\begin{tabular}{cc}
+\\
+$\neverlike{\tyVariant\{\}}$
+& ${\neverlike{T}} \over {\neverlike{\tyBorrow(\_,T)}}$
+\\
+\\
+\end{tabular}
+
+Since values of these types do not exist, ownership of such a value along
+a given control-flow path is evidence that that particular control-flow path
+can never be reached.
+
+Therefore, any function which returns a never-like value in one of its return
+paths can be assumed to never return along that particular path.
+The verifier treats specially any function call which has a value of a never-like type as its \emph{first} return value for some return path:
+because the path can never be taken, the verifier disregards that
+return edge in the control-flow graph.
+
+(The restriction to only the first return value is for simplicity and
+speed of the verifier, and does not lose generality: if any but the
+first return value is never-like, then the program can call the
+identity function on that value as its next instruction and trigger
+the special handling.)
+
+\medskip
+One practical example of this effect is the \texttt{goto} pseudo-instruction,
+which is a function with the signature
+\begin{center}
+  \texttt{goto : () $\to$ (never) | ()}
+\end{center}
+which means that it will never return through its normal return path
+to the following instruction.
 
 \end{document}
