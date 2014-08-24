@@ -5,7 +5,7 @@
 \newcommand\tyVar{{\ensuremath\textit{var}}}
 \newcommand\tyApp{{\ensuremath\textit{app}}}
 \newcommand\tyBorrow{{\ensuremath\textit{borrow}}}
-\newcommand\tyBless{{\ensuremath\textit{bless}}}
+\newcommand\tyBless{{\ensuremath{\textnormal{\textit{bless}}}}}
 \newcommand\tyCurse{{\ensuremath\textit{curse}}}
 \newcommand\tyPtr{{\ensuremath\textit{ptr}}}
 \newcommand\tyPad{{\ensuremath\textit{pad}}}
@@ -235,7 +235,35 @@ will be modelled using functions with \emph{multiple exits}.
 \part{Types and Operations}
 
 \chapter{Introduction}
+\chapter{Small functions}
+% Pseudo-instructions not tied to any specific type or type constructor.
+
+\texttt{goto : () $\to$ (never) | ()}
+
 \chapter{Small constructed types}
+
+\section{Common type tags}
+
+\subsection*{Identity}
+It is at times useful to tie a type to a specific value of another type.
+The \emph{identity tag} \texttt{virtualvm.basis.id} is used for this.
+
+In \texttt{linearvm.basis}:\\
+\texttt{give\_identity : (T) $\to$ $\exists$ X: \tyBless(virtualvm.basis.id, X, T)}
+
+\subsection*{Number relations}
+Especially in connection with array subscript checking it is useful to encode
+relations among integral numbers.
+The following type tags exist for that purpose:
+
+\begin{itemize}
+\item \texttt{linearvm.basis.equal}
+\item \texttt{linearvm.basis.inequal}
+\item \texttt{linearvm.basis.less\_than}
+\item \texttt{linearvm.basis.less\_or\_equal}
+\end{itemize}
+
+The use of these tags will be described in more detail later in this chapter.
 
 \section{Void}
 ``Void'' (\texttt{linearvm.basis.void}) is the unit type.
@@ -283,6 +311,7 @@ It is defined as
 \begin{center}
   \verb|variant {false: void, true: void}|
 \end{center}
+
 \subsection*{Operations}
 
 \begin{itemize}
@@ -294,10 +323,39 @@ It is defined as
   (\texttt{linearvm.variant.case}) on the variant type.
 \end{itemize}
 
+\section{Proof types -- Relations among integers}
 
-% Void
-% Bottom/never
-% Boolean
+The following helper types are defined to encode knowledge of the relation of
+integer values:
+
+\medskip
+\noindent
+$\mathtt{linearvm.basis.equal}[X_1,X_2] := \tyBless(\mathtt{linearvm.basis.equal}, X_1,X_2, \mathtt{void})$
+$\mathtt{linearvm.basis.inequal}[X_1,X_2] := \tyBless(\mathtt{linearvm.basis.inequal}, X_1,X_2, \mathtt{void})$
+$\mathtt{linearvm.basis.less\_than}[X_1,X_2] := \tyBless(\mathtt{linearvm.basis.less\_than}, X_1,X_2, \mathtt{void})$
+$\mathtt{linearvm.basis.less\_or\_equal}[X_1,X_2] := \tyBless(\mathtt{linearvm.basis.less\_or\_equal}, X_1,X_2, \mathtt{void})$
+
+\subsection*{Operations}
+
+In \texttt{linearvm.basis}:\\
+\begin{tabular}{r@{}l}
+\texttt{compare : \&id(X1,int), \&id(X2,int) $\to$}
+& \texttt{less\_than[X1,X2]}\\
+$|\;$ & \texttt{equal[X1,X2]}\\
+$|\;$ & \texttt{less\_than[X2,X1]}\\
+\end{tabular}
+\\
+\begin{tabular}{l@{}l}
+\texttt{commute : \&equal[X1,X2]} & \texttt{$\to$ equal[X2,X1]}\\
+\texttt{relax : \&less\_than[X1,X2]} & \texttt{$\to$ less\_or\_equal[X1,X2]}\\
+\texttt{relax : \&equal[X1,X2]} & \texttt{$\to$ less\_or\_equal[X1,X2]}\\
+\end{tabular}
+\\
+\begin{tabular}{l@{}l}
+\texttt{combine : \&less\_or\_equal[X1,X2], \&less\_or\_equal[X2,X1]}
+& \texttt{$\to$ equal[X1,X2]}\\
+\end{tabular}
+
 \chapter{Integer types}
 \chapter{Floating-point types}
 \chapter{Bytestrings}
@@ -311,6 +369,46 @@ It is defined as
 % breturn : all(ID): (curse(borrowee, <ID>, T), borrowed(<ID>, T)) -> T
 
 \chapter{Arrays}
+
+Arrays are integer-indexed sets of values.
+Array indexing takes constant time.
+Arrays are created with a fixed, finite capacity.
+
+\section{Entry validity}
+
+What makes arrays difficult to model is the absence of general null values:
+Each valid array entry must contain *something*, so when we create an
+array of some non-fixed size, then if all the entries are valid, we
+have just created a non-fixed number of values.
+This won't do in the general case, with any type.
+
+We therefore associate with each array value not just a length, but
+also a measure of how much of the array is initialized, i.e. which of
+the entries are valid.
+
+We restrict this set to be a \emph{prefix} of the array (at least at
+present -- support for initialized suffixes, or circular buffers, can
+be added later).
+
+\section{Bounds checking}
+In any safe language, array indexing must be subject to \emph{bounds checks}
+-- verification that the integer used for indexing does in fact correspond to
+an entry within the finite range of the array.
+
+It is often the goal of implementations of such languages to optimize
+away these checks, as they cost run-time performance.
+
+Because of the flexiblity of LinearVM's type system, we have the option
+of requiring index validity proof on access to arrays.
+
+% Allocation
+% Deallocation
+% "Valid" pointer adjustment (first store & final fetch)
+% Update - at valid index
+% Fetch - swap
+% Fetch - borrow
+% Swap two elements
+
 \chapter{Records}
 % create, fetch, store, borrow, deconstruct
 
