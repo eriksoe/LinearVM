@@ -24,9 +24,15 @@
 \chapter{Type system}
 \label{chap:typesystem}
 
-\section{Overview}
-All primitive types in LinearVM are not listed or described
-in the type system proper; they are treated as imported types.
+\section{introduction}
+
+The main property of values and variables in LinearVM are their type.
+Any value in LinearVM belongs to a type -- and sometimes to more than
+one type.
+
+Most primitive types in LinearVM, in particular the numeric types, are
+not listed or described in the type system proper; they are instead
+treated as imported types.
 
 All composite types, however, are constructed using the set of
 \emph{type constructors} of the type system.
@@ -34,8 +40,10 @@ All composite types, however, are constructed using the set of
 The type constructors belong roughly to the following groups:
 \begin{description}
 \item[Importing] For linking, and for access to primitive types.
-\item[Product and sum types] The bread and butter of type construction.
-\item[Genericity] Type variables and their supporting constructs.
+\item[Product and sum types] The bread and butter, or structural
+  backbone, of type construction.
+\item[Genericity] Parametric polymorphism; type variables and their
+  supporting constructs.
 \item[Dynamic dispatch] Behavioural polymorphism.
 \item[Borrowing] Accessing object fields without having to deconstruct
   the objects.
@@ -44,6 +52,85 @@ The type constructors belong roughly to the following groups:
   between different values.
 \item[Memory] Pointers and padding.
 \end{description}
+
+
+\section{Overview}
+
+\paragraph{Importing:}
+A module (compilation unit) may \emph{import} types from other modules.
+Built-in types are accessed this way.
+In particular, all numeric primitive types are imported; for instance,
+the type of 32-bit unsigned integers are imported as
+\texttt{linearvm.basis.uint}, and double-precision floating point
+numbers are importeded as \texttt{linearvm.basis.double}.
+
+\paragraph{Structure:}
+Structure is described using product and sum types. In LinearVM, they
+are known as \emph{record} and \emph{variant} types.
+Enumeration types are a special case of variant types.
+Booleans, for example, are defined as a variant type with two cases,
+each carrying a unit (void) type.
+The unit type (called \emph{void}) is simply the record type with zero fields.
+
+\paragraph{Genericity:}
+Genericity, or parametric polymorphism, is described using
+\emph{type variables} and \emph{type application}.
+For instance, a pair of $T$s for any type $T$ can be defined as
+$$pair[T] := \forall T:record\{a:T, B:T\}$$
+and instantiated like
+$$pair[bool]$$
+(in reality, the $\forall$ quantor is implied rather than explicit).
+
+\paragraph{Recursive types:}
+Recursive data types also use type variables.
+For instance, a cons list of \texttt{int32}s must be defined as a recursive type,
+which can be done like this:
+$$
+int32list := rec(T, variant\{nil:void, cons:record\{head:\mathtt{int32}, tail:ptr(T)\}\}
+$$
+Note that this definition uses a pointer at the point of
+recursion. This is necessary for the type to have a finite size. More
+about this later.
+
+The recursion type constructor can be used on several type variables at the same time, to define mutually recursive types.
+
+\paragraph{Dynamic dispatch:}
+Different programming paradigms have different names for their mechanism
+for behavioural polymorphism: function pointer, closure, vtable.
+In LinearVM it's called a \emph{vtable}.
+A vtable is a record of function pointers. Vtables are static entites, and
+can only be constructed at compile time, not at runtime.
+
+\paragraph{Borrowing:}
+In a purely linear type system, you can't access fields within a
+structure while they are part of the structure. This means that in
+order to read e.g.  a numeric value out of a structure, you must
+decompose the structure and then put it back together afterwards.
+This is clearly not satisfactory for practical use.
+
+To overcome this limitation, we have \emph{borrowing} -- types which
+specify that this is not an owning reference, but merely borrowing
+with the obligation to return the value again (release the borrowing),
+while being ensured that the real owner is not allowed to do
+modifications to the value such as disposing of it) while it is lend
+out.
+
+% TODO: shared vs. exclusive; stack-to-stack borrowing vs. general case.
+
+\paragraph{Tagging:}
+% TODO -- incl. encapsulation
+
+\paragraph{Memory:}
+% TODO -- pointers (w/ design choice); padding
+
+
+\subsection{Typical combinations}
+\begin{itemize}
+\item Pointers and type recursion -- for recursive data types.
+\item Vtables and existential types (and pointers) -- for closures.
+\item Existential types and padding.
+\end{itemize}
+
 
 
 \section{Type properties}
@@ -200,6 +287,9 @@ t := \tyBless(n,a,t)
 $$
 
 $$\fixedsize(t) \over \fixedsize(\tyBless(n,a,t))$$
+
+\subsection{Borrowing}
+
 
 \subsection{Pointers}
 The purpose of pointer types is to represent data structures of variable length
