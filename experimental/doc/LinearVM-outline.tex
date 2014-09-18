@@ -14,6 +14,12 @@
 
 \newcommand\tyVoid{{\ensuremath\textit{void}}}
 
+\newcommand\TypeDefinition[1]{\begin{quote}$\mathit{#1}$\end{quote}}
+\newcommand\FuncSignature[2]{\begin{quote}$\mathit{#1}\ :\ \mathit{#2}$\end{quote}}
+\newcommand\FuncSignatureII[3]{\begin{quote}$\mathit{#1}\ :\ \mathit{#2} \to$\\${}\quad \mathit{#3}$ \end{quote}}
+\newcommand\TagDefinition[1]{\begin{quote}$\mathtt{#1}$\end{quote}}
+\newcommand\TagDefinitionII[2]{\begin{quote}$\mathtt{#1}(#2)$\end{quote}}
+
 \begin{document}
 
 \tableofcontents
@@ -359,6 +365,13 @@ $|\;$ & \texttt{less\_than[X2,X1]}\\
 \chapter{Integer types}
 \chapter{Floating-point types}
 \chapter{Bytestrings}
+
+
+% Allocate: ?
+% get_size: bytestring -> uint
+
+
+
 \chapter{Strings}
 \chapter{Borrowing}
 % Two types of borrowing: shared (read-only) and exclusive (read-write).
@@ -430,6 +443,86 @@ of requiring index validity proof on access to arrays.
 % malloc: () -> bless(mallocated, ptr(pad(void, T)))
 % free: bless(mallocated, ptr(pad(void, T))) -> ()
 
+\chapter{Back-pointers}
+% Tentative... & WIP
+``Back-pointers'' is a mechanism for referring to locations within
+a data structure, and for doubly-linked data structures.
+Back-pointers are a certain kind of non-owning pointers.
+
+\begin{itemize}
+\item Back-pointers can be set or unset. They start out being unset.
+  A back-pointer can only point to one value at a time.
+\item Back-pointers are parametrized with a type $T$.
+  When set, a back-pointer holds a pointer to $T$.
+\item If a back-pointer points to a value, that value must exist,
+  and must keep existing while being pointed at.
+\end{itemize}
+
+There are three entities involved when manipulating a back-pointer:
+% TODO: There should in fact be four: the pointee should have a state token too. This improves and simplifies the interface (making bind2/unbind2/decurse unnecessary).
+\begin{enumerate}
+\item The back-pointer itself.
+\item The value which the back-pointer is to point to.
+  Or, more precisely, the owning pointer of that value.
+\item A token value which testifies either that the back-pointer is unset,
+  or that is pointing at the value.
+\end{enumerate}
+
+\subsection*{Types}
+The package containing the functions for manipulating back-pointers is
+\texttt{linearvm.backpointer}.
+
+It defines the types:
+
+\TypeDefinition{backpointer[T,BPID]}
+\TypeDefinition{unbound[BPID]}
+\TypeDefinition{bound[BPID,VID]}
+
+And tags:
+\TagDefinitionII{bound}{BPID,VID}
+
+
+\section*{Operations}
+
+\subsection*{Creation}
+The first step in using a back-pointer is creating it.
+At the same time, a token value is created which testifies that the
+back-pointer is unset:
+\FuncSignature{create}{() \to \exists ID.(backpointer[T,BPID], unbound[BPID])}
+
+\subsection*{Binding and unbinding}
+An unbound back-pointer can be bound. This ties up the pointer it is
+bound to, ensuing that it will keep existing and won't change type:
+\FuncSignatureII{bind}{(\&backpointer[T,BPID], unbound[BPID], pointer(P,T))}
+{\exists VID.(bound[BPID,VID], pointer(curse(\texttt{bound}(BPID,VID),P),T))}
+
+\noindent
+Unbinding occurs similarly:
+\FuncSignatureII{unbind}{
+\forall VID.(\&backpointer[T,BPID], bound[BPID,VID], pointer(curse(\texttt{bound}(BPID,VID),P),T))}
+{(unbound[BPID], pointer(P,T))}
+
+\noindent
+There exist variants of these which don't change the pointer type:
+\FuncSignatureII{bind2}{(\&backpointer[T,BPID], unbound[BPID], \&pointer(curse(\texttt{bound}(BPID,VID),P),T))}{\exists VID.(bound[BPID,VID])}
+
+\FuncSignatureII{unbind2}{
+\forall VID.(\&backpointer[T,BPID], bound[BPID,VID], \&pointer(curse(\texttt{bound}(BPID,VID),P),T))}
+{(unbound[BPID])}
+
+\noindent
+This way of operating works together with the following function for
+de-cursing the pointer, given proof that the back-pointer is unbound:
+
+\FuncSignatureII{decurse}{\forall BPID.\forall VID.(\&unbound[BPID], pointer(curse(\texttt{bound}(BPID,VID),P),T))}
+{(pointer(P,T))}
+
+\subsection*{Accessing backpointers}
+
+% TODO: ensure that you can't bind-access-unbind-deallocate-deaccess...
+
+% create: () -> \exists X:(revptr(X, T), permission_to_set(X))
+% set: \forall X,PT: (permission_to_set(X), bless(ID,ptr(PT,T))) -> rev_ptr_set(ID), ???bless(ID,ptr(PT,T))
 
 \part{File Format}
 
