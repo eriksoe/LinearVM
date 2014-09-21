@@ -561,6 +561,50 @@ The following functions are provided for this purpose:
 \FuncSignature{paradox\_bound\_pointee}{
   (unbound[BPID], bound\_pointee[BPID,VID]) \to \mathtt{never}}
 
+\chapter{Paradoxes}
+The package \texttt{linearvm.paradox} contains types and operations
+with the primary purpose of expressing invariants in paradox form --
+i.e. deriving a value of the type \texttt{never}.
+
+\section{Tick-tock}
+Tick-tock is a two-phase token type.
+It is defined in the package \texttt{linearvm.paradox.ticktock}.
+The fundamental invariant is that the value associated with a given identity
+is at any point either tick or tock, but never both.
+Tick-tock can be used e.g. for expressing temporary suspension of an invarant.
+
+\subsection*{Types}
+\TypeDefinition{tick[ID] = tag(\texttt{tick}(ID), void)}
+\TypeDefinition{tock[ID] = tag(\texttt{tock}(ID), void)}
+
+\subsection*{Operations}
+\subsubsection*{Creation and disposal}
+\FuncSignature{create\_tick}{() \to \exists ID.tick[ID]}
+\FuncSignature{dispose}{ID.tick[ID] \to ()}
+
+\subsubsection*{Phase shift}
+\FuncSignature{to\_tock}{(ID.tick[ID]) \to ID.tock[ID]}
+\FuncSignature{to\_tick}{(ID.tock[ID]) \to ID.tick[ID]}
+
+\subsubsection*{Paradox proofs}
+Given the invariant that the value associated with a given identity
+can never at the same time be tick and tock, we get the paradox proof:
+\FuncSignature{paradox}{(\&ID.tick[ID], \&ID.tock[ID]) \to \texttt{never}}
+
+\chapter{Miscellaneous}
+
+\section{Panic}
+
+There is a (restricted/restrictable) equivalent to C's \texttt{abort()} function.
+It is defined in the package \texttt{linearvm.panic}.
+
+\subsection*{Types}
+\TypeDefinition{permission\_to\_panic = bless(\texttt{permission\_to\_panic}, \texttt{void})}
+
+\subsection*{Operations}
+\FuncSignature{panic}{permission\_to\_panic \to \texttt{never}}
+
+
 \part{File Format}
 
 \part{Implementation}
