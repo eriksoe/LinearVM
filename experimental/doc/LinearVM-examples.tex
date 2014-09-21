@@ -1,0 +1,34 @@
+\documentclass[a4paper]{book}
+
+\begin{document}
+\chapter{Examples}
+
+The examples in this chapter is mainly inspired by the Erlang
+programming model.
+
+\section{Message inbox}
+
+Message queue with Erlang-style selective receive: First message to
+pass a given criterion (if any) is taken out of the queue.
+
+% TODO: How do we even represent a queue with a tail pointer?
+% Can borrowing be made flexible enough for that?
+% Operations:
+% - create empty.
+% - insert at tail.
+% - traverse from head, using links, pick first satisfying criterion out.
+%
+% +------+
+% | head ----->A--->B---->C
+% |      |                ^
+% | tail -----------------'
+% +------+
+% Can this be solved with auto-back-pointing?
+%
+% => "Auxiliary pointers"
+
+$$
+mqueue[T] := record(TODO)
+$$
+
+\end{document}

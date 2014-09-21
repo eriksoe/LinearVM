@@ -18,7 +18,7 @@
 \newcommand\FuncSignature[2]{\begin{quote}$\mathit{#1}\ :\ \mathit{#2}$\end{quote}}
 \newcommand\FuncSignatureII[3]{\begin{quote}$\mathit{#1}\ :\ \mathit{#2} \to$\\${}\quad \mathit{#3}$ \end{quote}}
 \newcommand\TagDefinition[1]{\begin{quote}$\mathtt{#1}$\end{quote}}
-\newcommand\TagDefinitionII[2]{\begin{quote}$\mathtt{#1}(#2)$\end{quote}}
+\newcommand\TagDefinitionII[2]{\begin{quote}$\mathtt{#1}(\mathit{#2})$\end{quote}}
 
 \begin{document}
 
@@ -443,86 +443,123 @@ of requiring index validity proof on access to arrays.
 % malloc: () -> bless(mallocated, ptr(pad(void, T)))
 % free: bless(mallocated, ptr(pad(void, T))) -> ()
 
-\chapter{Back-pointers}
+\chapter{Auxiliary pointers}
 % Tentative... & WIP
-``Back-pointers'' is a mechanism for referring to locations within
+``Auxiliary pointers'' is a mechanism for referring to locations within
 a data structure, and for doubly-linked data structures.
-Back-pointers are a certain kind of non-owning pointers.
+Auxiliary pointers are a certain kind of non-owning pointers.
 
 \begin{itemize}
-\item Back-pointers can be set or unset. They start out being unset.
-  A back-pointer can only point to one value at a time.
-\item Back-pointers are parametrized with a type $T$.
-  When set, a back-pointer holds a pointer to $T$.
-\item If a back-pointer points to a value, that value must exist,
+\item Auxiliary pointers can be set or unset. They start out being unset.
+  An auxiliary pointer can only point to one value at a time.
+\item Auxiliary pointers are parametrized with a type $T$.
+  When set, an auxiliary pointer holds a pointer to $T$.
+\item If an auxiliary pointer points to a value, that value must exist,
   and must keep existing while being pointed at.
+  A consequence of this is that, in a certain sense, the pointee must ``know''
+  that is may be a target of the auxiliary pointer.
 \end{itemize}
 
-There are three entities involved when manipulating a back-pointer:
+\noindent
+There are four entities involved when manipulating an auxiliary pointer:
 % TODO: There should in fact be four: the pointee should have a state token too. This improves and simplifies the interface (making bind2/unbind2/decurse unnecessary).
 \begin{enumerate}
-\item The back-pointer itself.
-\item The value which the back-pointer is to point to.
-  Or, more precisely, the owning pointer of that value.
-\item A token value which testifies either that the back-pointer is unset,
+\item The auxiliary pointer itself.
+\item The value which the auxiliary pointer is to point to (the pointee) --
+  or, more precisely, the owning pointer of that value.
+\item A token value which testifies either that the auxiliary pointer is unset,
   or that is pointing at the value.
+\item A token value which testifies whether the pointee is being
+  pointed to or not.
 \end{enumerate}
 
 \subsection*{Types}
-The package containing the functions for manipulating back-pointers is
-\texttt{linearvm.backpointer}.
+The package containing the functions for manipulating auxiliary pointers is
+\texttt{linearvm.auxpointer}.
 
+\smallskip
 It defines the types:
 
-\TypeDefinition{backpointer[T,BPID]}
+\TypeDefinition{auxpointer[BPID,T]}
+\TypeDefinition{auxpointee[VID,P,T] = pointer(curse(\texttt{auxpointee}(VID),P),T)}
+
+The token types:
+
 \TypeDefinition{unbound[BPID]}
 \TypeDefinition{bound[BPID,VID]}
+\TypeDefinition{unbound\_pointee[VID]}
+\TypeDefinition{bound\_pointee[BPID,VID]}
 
-And tags:
-\TagDefinitionII{bound}{BPID,VID}
+And the tag:
+\TagDefinitionII{auxpointee}{VID}
 
 
 \section*{Operations}
 
-\subsection*{Creation}
-The first step in using a back-pointer is creating it.
+\subsection*{Creation and disposal}
+The first step in using an auxiliary pointer is creating it.
 At the same time, a token value is created which testifies that the
-back-pointer is unset:
-\FuncSignature{create}{() \to \exists ID.(backpointer[T,BPID], unbound[BPID])}
+auxiliary pointer is unset:
+\FuncSignature{create}{() \to \exists BPID.(auxpointer[BPID,T], unbound[BPID])}
+
+\noindent
+Pointers are marked explicitly as potential pointees:
+\FuncSignatureII{mark\_pointee}
+{pointer(P,T)}
+{\exists VID.(auxpointee[VID,P,T], unbound\_pointee[VID])
+}
+
+\noindent
+Conversely, an unbound auxiliary pointer can be disposed of:
+\FuncSignature{dispose}{(auxpointer[BPID,T], unbound[BPID]) \to ()}
+
+\noindent
+And a potential pointee which is not currently bound can be unmarked:
+\FuncSignatureII{unmark\_pointee}
+{(auxpointee[VID,P,T], unbound\_pointee[VID])
+}
+{pointer(P,T)}
 
 \subsection*{Binding and unbinding}
-An unbound back-pointer can be bound. This ties up the pointer it is
-bound to, ensuing that it will keep existing and won't change type:
-\FuncSignatureII{bind}{(\&backpointer[T,BPID], unbound[BPID], pointer(P,T))}
-{\exists VID.(bound[BPID,VID], pointer(curse(\texttt{bound}(BPID,VID),P),T))}
+An unbound auxiliary pointer can be bound to an unbound pointee.
+This marks both the pointer and the pointee as bound:
+
+\FuncSignatureII{bind}
+{(\&auxpointer[BPID,T], unbound[BPID], \&auxpointee[VID,P,T], unbound\_pointee[VID])}
+{bound[BPID,VID], bound\_pointee[BPID,VID]}
 
 \noindent
 Unbinding occurs similarly:
-\FuncSignatureII{unbind}{
-\forall VID.(\&backpointer[T,BPID], bound[BPID,VID], pointer(curse(\texttt{bound}(BPID,VID),P),T))}
-{(unbound[BPID], pointer(P,T))}
+\FuncSignatureII{unbind}
+{(\&auxpointer[BPID,T], bound[BPID,VID], \&auxpointee[VID,P,T], bound\_pointee[BPID,VID])}
+{(unbound[BPID], unbound\_pointee[VID])}
 
-\noindent
-There exist variants of these which don't change the pointer type:
-\FuncSignatureII{bind2}{(\&backpointer[T,BPID], unbound[BPID], \&pointer(curse(\texttt{bound}(BPID,VID),P),T))}{\exists VID.(bound[BPID,VID])}
+\subsection*{Accessing auxiliary pointers}
 
-\FuncSignatureII{unbind2}{
-\forall VID.(\&backpointer[T,BPID], bound[BPID,VID], \&pointer(curse(\texttt{bound}(BPID,VID),P),T))}
-{(unbound[BPID])}
+A bound auxiliary pointer can be dereferenced:
 
-\noindent
-This way of operating works together with the following function for
-de-cursing the pointer, given proof that the back-pointer is unbound:
+\FuncSignature{deref}{
+  (\&auxpointer[BPID,T], \&bound[BPID,VID])
+  \to
+  curse(\mathtt{borrow}, auxpointee[VID,P,T])}
 
-\FuncSignatureII{decurse}{\forall BPID.\forall VID.(\&unbound[BPID], pointer(curse(\texttt{bound}(BPID,VID),P),T))}
-{(pointer(P,T))}
-
-\subsection*{Accessing backpointers}
+(TODO: get borrowing right: lock auxpointer for the duration.)
 
 % TODO: ensure that you can't bind-access-unbind-deallocate-deaccess...
 
 % create: () -> \exists X:(revptr(X, T), permission_to_set(X))
 % set: \forall X,PT: (permission_to_set(X), bless(ID,ptr(PT,T))) -> rev_ptr_set(ID), ???bless(ID,ptr(PT,T))
+
+\subsection*{Paradox proofs}
+
+At times, it is useful to be able to prove that certain invariants are
+guaranteed to hold because of a combination of available resources.
+The following functions are provided for this purpose:
+
+\FuncSignature{paradox\_bound\_pointer}{
+  (bound[BPID,VID], unbound\_pointee[VID]) \to \mathtt{never}}
+\FuncSignature{paradox\_bound\_pointee}{
+  (unbound[BPID], bound\_pointee[BPID,VID]) \to \mathtt{never}}
 
 \part{File Format}
 
