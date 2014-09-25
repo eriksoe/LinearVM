@@ -23,6 +23,43 @@ An important part of well-formedness is type consistency.
 At load time, the code files to be loaded are subject to \emph{code
   verification}, which is a series of checks that certain properties are fulfilled.
 
+\section{Trade-offs}
+As it is known from the field of Proof-Carrying Code, there is a
+three-way trade-off between
+\begin{description}
+\item[Expressiveness] -- what properties can be proved and verified;
+\item[Verifier computing power] -- how much of the proofs the verifier is to reconstruct; and
+\item[Explicitness] -- how much of the proofs are contained in the
+  program representation.
+\end{description}
+
+With stronger properties come usually larger proofs, which again
+requires either the verifier to be smarter or the program
+representation to be larger.
+
+With the expressiveness dictated by other requirements, we thus have a
+time/space trade-off between less compact programs and less simple and
+fast verification algorithms.
+
+LinearVM's design tends to favour simplicity over compactness.
+In particular, it aims to avoid:
+
+\begin{itemize}
+\item Fix-point algorithms.
+  %% JVM changed partly to a similar strategy, following "lightweight
+  %% bytecode verification" (http://evarose.net/thesis-submitted.pdf),
+  %% also known as "split verifier".
+\item Proof search.
+  Where more than one subtyping rule or similar is applicable, the
+  code must carry sufficient information to determine which, in bounded time.
+\item Type unification.
+  Rather than unification, verification criteria are defined in terms of
+  \emph{assignability}. This means that the verifier will not have to
+  reconstruct types at control flow joins etc.
+
+\end{itemize}
+
+
 \section{Checks}
 
 \begin{description}
