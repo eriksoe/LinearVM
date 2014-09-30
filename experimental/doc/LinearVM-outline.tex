@@ -25,7 +25,7 @@
 \tableofcontents
 \part{Architecture}
 
-\section{Introduction}
+\chapter{Introduction}
 
 \subsection{Background}
 % * The gap - platforms lacking proper concurrency guarantees
@@ -120,7 +120,7 @@ support FFI better than most other mechanisms, given that linear types are good 
 describing management of resources such as entities provided by
 foreign libraries.
 
-\section{Design basics}
+\chapter{Design basics}
 % All values are linear at the outset
 % I.e. copying & disposal are explicit
 % Consequences for exceptions
@@ -132,7 +132,7 @@ Design decisions tend to interact.
 The following is a list of choices, approximately ordered by scope and
 implications (wider and more basic decisions first).
 
-\subsection{Linear types}
+\section{Linear types}
 Firstly, supporting the combination of data race safety and imperative
 paradigms leads to the use of linear types.
 
@@ -168,7 +168,7 @@ Thus, not only do we choose to support linear types -- we make them the
 norm; in essence, all types are linear, and copying and destroying of values
 is only possible if explicitly allowed.
 
-\subsection{Layering}
+\section{Layering}
 The bytecode-verification algorithm is central to this project.
 For security and robustness, it should be made as simple as the
 typing rules allow -- yet flexible enough, of course, for real-world
@@ -203,7 +203,7 @@ is in contrast to e.g. the JVM and CLR designs, in which the
 byte-code verifier has hard-coded knowledge of a set of primitive types
 and certain operations on them.
 
-\subsection{Exceptions}
+\section{Exceptions}
 
 Linear types and exceptions don't play well together.
 For standard exception propagation to work, one must assume that
@@ -221,9 +221,69 @@ a higher level of abstraction.
 Operations which can either complete succesfully or terminate exceptionally
 will be modelled using functions with \emph{multiple exits}.
 
-\subsection{Multiple function exits}
+\section{Multiple function exits}
 
-% TODO
+\section{Register machine}
+
+\section{Borrowing}
+As mentioned, all values are linear.  Let's qualify this: Every value
+has a primary owner, but there can be secondary references to a value,
+subject to certain restrictions.
+
+There are several advantages to linear values, including:
+\begin{itemize}
+\item no risk of race conditions
+\item simple resource management: you know when the value is no longer live
+\item no tracing garbage collector is required
+\end{itemize}
+
+\noindent
+However, a \emph{purely} linear type system has it drawbacks as well:
+\begin{itemize}
+\item Subvalues of a composite data structure can't be accessed
+  without deconstructing the value. This is particularly bothersome
+  for deep field accesses.
+
+\item Values can never be shared, even for read-only purposes; instead,
+  values must be copied deeply.
+
+\item Certain data structures, such as doubly linked lists, or even
+  singly linked lists with a pointer to the tail, or other data
+  structures which have several pointers to one value, can not be
+  expressed -- at least not with the same (asymptotic) performance,
+  using purely linear types.
+\end{itemize}
+
+To overcome these deficiencies while keeping the advantages of linear types,
+LinearVM has the concept of \emph{borrowing}.
+
+A borrowed value is a secondary reference to a value.
+While there is always just a single primary reference to a given value
+-- from its linear owner -- there can be several secondary references.
+
+Borrowing comes in two flavours: \emph{exclusive} and \emph{shared} borrowing.
+
+An owning reference, an exclusive borrowing, and a shared borrowing differ
+with respect to what can be done with them:
+\begin{itemize}
+\item A \emph{shared} borrowing can be used for \emph{reading}: to test,
+  probe, and copy the value or parts thereof.
+\item An \emph{exclusive} borrowing can furthermore be used to \emph{modify} the value,
+  as long as the value's type remains unchanged.
+
+\item An \emph{owning} reference can furthermore be used with
+  operations which \emph{consume} the value, including operations
+  which transform it into a value of a different type or which dispose
+  of the value altogether.
+\end{itemize}
+
+The mechanisms for obtaining and manipulating borrowings impose restrictions
+so that the central invariant is maintained that:
+\begin{quote}
+  As long as a value can be accessed through one reference,
+  it can not be modified through another reference.
+\end{quote}
+
 
 \part{Type System}
 
