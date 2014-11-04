@@ -538,18 +538,33 @@ The package containing the functions for manipulating auxiliary pointers is
 \texttt{linearvm.auxpointer}.
 
 \smallskip
-It defines the types:
+The types in the package are parametrized by four kinds of type variables, named:
+\begin{quote}
+\begin{description}
+\item[T] -- Value type
+\item[P] -- Pointer flavour
+\item[APID] -- Auxiliary pointer identity
+\item[VID] -- Value identity
+\end{description}
+\end{quote}
 
-\TypeDefinition{auxpointer[BPID,T]}
+
+\smallskip
+\noindent
+The package defines the types:
+
+\TypeDefinition{auxpointer[APID,T]}
 \TypeDefinition{auxpointee[VID,P,T] = pointer(curse(\texttt{auxpointee}(VID),P),T)}
 
+\noindent
 The token types:
 
-\TypeDefinition{unbound[BPID]}
-\TypeDefinition{bound[BPID,VID]}
+\TypeDefinition{unbound[APID]}
+\TypeDefinition{bound[APID,VID]}
 \TypeDefinition{unbound\_pointee[VID]}
-\TypeDefinition{bound\_pointee[BPID,VID]}
+\TypeDefinition{bound\_pointee[APID,VID]}
 
+\noindent
 And the tag:
 \TagDefinitionII{auxpointee}{VID}
 
@@ -560,7 +575,7 @@ And the tag:
 The first step in using an auxiliary pointer is creating it.
 At the same time, a token value is created which testifies that the
 auxiliary pointer is unset:
-\FuncSignature{create}{() \to \exists BPID.(auxpointer[BPID,T], unbound[BPID])}
+\FuncSignature{create}{() \to \exists APID.(auxpointer[APID,T], unbound[APID])}
 
 \noindent
 Pointers are marked explicitly as potential pointees:
@@ -571,7 +586,7 @@ Pointers are marked explicitly as potential pointees:
 
 \noindent
 Conversely, an unbound auxiliary pointer can be disposed of:
-\FuncSignature{dispose}{(auxpointer[BPID,T], unbound[BPID]) \to ()}
+\FuncSignature{dispose}{(auxpointer[APID,T], unbound[APID]) \to ()}
 
 \noindent
 And a potential pointee which is not currently bound can be unmarked:
@@ -585,21 +600,21 @@ An unbound auxiliary pointer can be bound to an unbound pointee.
 This marks both the pointer and the pointee as bound:
 
 \FuncSignatureII{bind}
-{(\&auxpointer[BPID,T], unbound[BPID], \&auxpointee[VID,P,T], unbound\_pointee[VID])}
-{bound[BPID,VID], bound\_pointee[BPID,VID]}
+{(\&auxpointer[APID,T], unbound[APID], \&auxpointee[VID,P,T], unbound\_pointee[VID])}
+{bound[APID,VID], bound\_pointee[APID,VID]}
 
 \noindent
 Unbinding occurs similarly:
 \FuncSignatureII{unbind}
-{(\&auxpointer[BPID,T], bound[BPID,VID], \&auxpointee[VID,P,T], bound\_pointee[BPID,VID])}
-{(unbound[BPID], unbound\_pointee[VID])}
+{(\&auxpointer[APID,T], bound[APID,VID], \&auxpointee[VID,P,T], bound\_pointee[APID,VID])}
+{(unbound[APID], unbound\_pointee[VID])}
 
 \subsection*{Accessing auxiliary pointers}
 
 A bound auxiliary pointer can be dereferenced:
 
 \FuncSignature{deref}{
-  (\&auxpointer[BPID,T], \&bound[BPID,VID])
+  (\&auxpointer[APID,T], \&bound[APID,VID])
   \to
   curse(\mathtt{borrow}, auxpointee[VID,P,T])}
 
@@ -617,9 +632,9 @@ guaranteed to hold because of a combination of available resources.
 The following functions are provided for this purpose:
 
 \FuncSignature{paradox\_bound\_pointer}{
-  (bound[BPID,VID], unbound\_pointee[VID]) \to \mathtt{never}}
+  (bound[APID,VID], unbound\_pointee[VID]) \to \mathtt{never}}
 \FuncSignature{paradox\_bound\_pointee}{
-  (unbound[BPID], bound\_pointee[BPID,VID]) \to \mathtt{never}}
+  (unbound[APID], bound\_pointee[APID,VID]) \to \mathtt{never}}
 
 \chapter{Paradoxes}
 The package \texttt{linearvm.paradox} contains types and operations
