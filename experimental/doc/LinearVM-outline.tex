@@ -1,5 +1,7 @@
 \documentclass[a4paper]{book}
 
+\usepackage[plain]{fancyref}
+
 % Type constructors:
 \newcommand\tyImport{{\ensuremath\textit{import}}}
 \newcommand\tyVar{{\ensuremath\textit{var}}}
@@ -226,6 +228,7 @@ will be modelled using functions with \emph{multiple exits}.
 \section{Register machine}
 
 \section{Borrowing}
+\label{sec:design-borrowing}
 As mentioned, all values are linear.  Let's qualify this: Every value
 has a primary owner, but there can be secondary references to a value,
 subject to certain restrictions.
@@ -284,6 +287,40 @@ so that the central invariant is maintained that:
   it can not be modified through another reference.
 \end{quote}
 
+\subsection{Local borrowing} %% Naming ??
+\label{sec:design-local-borrowing}
+A common special case of borrowing is when a function borrows a value
+from its caller -- or, in term of owners, when a function borrows a value from
+the stack frame below it -- and returns it on exit (on every exit path).
+
+In this case, there is a shortcut which uses the same underlying mechanism,
+but which reduces book-keeping.
+It is called \emph{local borrowing}, and
+is denoted in the function's signature with a ``\texttt{\&}'' or
+``\texttt{\&!}'' prefix to the type (for shared resp. exclusive
+borrowing), like this:
+\FuncSignature{add}{(a:\&int, b:\&int) \to int}
+
+The advantage of local borrowing is that both the ``borrow'' and the
+``return'' operation are made part of the actual function call.
+The borrowed value is returned implicitly. The use of local borrowing requires,
+however, that at all return points the borrowed value is present in the
+same register as it was in when the function was entered.
+(Note, though, that this does not mean that the borrowed value must be
+unchanged since the function was entered.)
+
+Compare with the function signature of a version of \emph{add} which does
+not use local borrowing:
+
+\FuncSignatureII{add}
+{(a:borrow\_shared(ID1,int), b:borrow\_shared(ID2,int))}
+{(a:borrow\_shared(ID1,int), b:borrow\_shared(ID2,int), result:int)}
+
+Local borrowing can obviously only be used when borrowing and returning
+follows the call stack. In other cases, and when the borrowings are
+put in data structures off the stack, regular ``full'' borrowing must be used.
+In both cases, though, the same underlying mechanism is used, as far
+as the type system is concerned.
 
 \part{Type System}
 
@@ -434,10 +471,47 @@ $|\;$ & \texttt{less\_than[X2,X1]}\\
 
 \chapter{Strings}
 \chapter{Borrowing}
-% Two types of borrowing: shared (read-only) and exclusive (read-write).
+As described in \fref{sec:design-borrowing}, borrowing is used when
+more than one reference to a value is needed at the same time, and also
+when a value passed to a function is returned from it through all exit paths.
+As mentioned, there are two types of borrowing: shared (read-only) and
+exclusive (read-write).
 
-% These aren't final:
-% borrow : T -> exists(ID): (curse(borrowed, <ID>, T), borrowed(<ID>, T))
+Beside the operations listed here, the parameter passing mechanism of
+\emph{local borrowing} (\ref{sec:design-local-borrowing})
+converts linear values to and from borrowed ones.
+% TODO: That mechanism should be described in detail somewhere.
+
+\subsection*{Operations}
+Borrowing exclusively:
+
+\FuncSignature{borrow}{T \to \exists ID: (curse(borrowed, ID, T), borrow\_excl(ID, T))}
+\FuncSignature{unborrow}{\forall ID: (curse(borrowed, ID, T), borrow\_excl(ID, T)) \to T}
+
+\noindent
+Borrowing shared:
+
+\FuncSignature{borrow\_shared}{T \to \exists ID: (curse(borrowed, ID, T), borrow\_shared(ID, T))}
+\FuncSignature{unborrow\_shared}{\forall ID: (curse(borrowed, ID, T), borrow\_shared(ID, T)) \to T}
+
+\noindent
+From exclusive to shared:
+
+\FuncSignature{weaken}{borrow\_excl(ID, T) \to (borrow\_shared(ID, T), strengthen\_token[ID,T]}
+\FuncSignature{strengthen}{(borrow\_shared(ID, T), strengthen\_token[ID,T]) \to (borrow\_excl(ID, T)}
+
+\noindent
+From shared to twice shared:
+
+\FuncSignatureII{split}
+{borrow\_shared(ID, T)}
+{(borrow\_shared(ID1, T), borrow\_shared(ID2, T), join\_token(ID1,ID2,ID))}
+
+\FuncSignatureII{join}
+{(borrow\_shared(ID1, T), borrow\_shared(ID2, T), join\_token(ID1,ID2,ID))}
+{borrow\_shared(ID, T)}
+
+
 % borrow_ro : T -> exists(ID): (curse(borrowed_ro, <ID>, T), borrowed(<ID>, curse(read_only, T)))
 % breturn : all(ID): (curse(borrowee, <ID>, T), borrowed(<ID>, T)) -> T
 
@@ -508,6 +582,7 @@ of requiring index validity proof on access to arrays.
 ``Auxiliary pointers'' is a mechanism for referring to locations within
 a data structure, and for doubly-linked data structures.
 Auxiliary pointers are a certain kind of non-owning pointers.
+% TODO: Relation to borrowed pointers: double-ended-ness.
 
 \begin{itemize}
 \item Auxiliary pointers can be set or unset. They start out being unset.
