@@ -49,12 +49,12 @@
 
 The design priorities are, in order from most important to less important:
 
-\begin{itemize}
+\begin{enumerate}
 \item Safety (type and concurrency)
 \item Flexibility
 \item Simplicity
 \item Performance (cheapness in space and time).
-\end{itemize}
+\end{enumerate}
 
 \subsubsection*{Safety}
 Safety is paramount. The only (lamentable) exception is the
@@ -114,7 +114,7 @@ enforces type safety and safety against data races.
 The type system should be enforced by a bytecode verifier.
 
 In order to be of practical use, the VM should have a FFI (foreign
-function interface).  This is of course in itself a compromisation of
+function interface).  This is of course in itself a compromise of
 type integrity and so forth, but it appears to be a practical necessity
 -- all VMs
 in practical use have it.  The linear type system would presumably
@@ -224,8 +224,44 @@ Operations which can either complete succesfully or terminate exceptionally
 will be modelled using functions with \emph{multiple exits}.
 
 \section{Multiple function exits}
+Functions can be formalized as taking either a list of
+parameters (like e.g. in the Algol language family) or always a single
+parameter, which may be a tuple (like in the ML language family).
+Equivalently, functions can be formalized as returning either through
+a single exit (where the return type may be a sum type), or through
+one of a list of exits.\footnote{
+To be clear: this is orthogonal to whether each exit returns a single
+value or a list of tuples.}
+
+For some reason,\footnote{
+  We expect that this hole in the design space to have syntactic roots
+  -- that is, to be related to the syntax of function calls:
+  the language-level lack of structured ways to elegantly specify
+  multiple continuations (or rather, the separation of constructs with
+  multiple continuations -- if, switch, try -- from the function call
+  construct has rubbed off
+  on the implementation-level designs of function call mechanisms.
+} the latter option -- multiple exits -- is rarely if
+ever seen except as hidden in the special case of exceptions, in which
+case there are (implicitly) two exits: normal and exceptional termination.
+
+LinearVM departs from normal designs on this point: while multiple
+function exits would work well also with non-linear type systems,
+the need for explicit representation of exception paths in particular
+make it very attractive to have multiple function exits supported at the
+lowest level.
+(The alternative being to wrap and unwrap both exceptional and normal
+return values as sum types whenever a function may generate an exception.)
+
+\smallskip
+Interestingly, with the inclusion of multiple function exits, certain
+common machine instructions lose their special status: branching instructions
+can be replaced with functions. This has implications for the
+simplicity of the instruction set, as described in the next section.
 
 \section{Register machine}
+% TODO
+
 
 \section{Borrowing}
 \label{sec:design-borrowing}
@@ -512,6 +548,14 @@ From shared to twice shared:
 {borrow\_shared(ID, T)}
 
 
+% \noindent
+% Temporarily changing type of an exclusive borrowed value:
+% For all $T$ and $T'$ with the same type representation:
+% \FuncSignatureII{retype}{borrow\_excl(ID, T)}{\exists ID': (borrow\_excl(ID', T'), retype\_token(ID',T',ID,T))}
+% \FuncSignatureII{de\_retype}{(borrow\_excl(ID', T'), retype\_token(ID',T',ID,T))}{borrow\_excl(ID, T)}
+% TODO: Not stable API. Actual type change happens at e.g. record field store. Address this.
+
+
 % borrow_ro : T -> exists(ID): (curse(borrowed_ro, <ID>, T), borrowed(<ID>, curse(read_only, T)))
 % breturn : all(ID): (curse(borrowee, <ID>, T), borrowed(<ID>, T)) -> T
 
@@ -566,6 +610,7 @@ of requiring index validity proof on access to arrays.
 % dispose: vtable(\ldots) -> ()
 \chapter{Existentials}
 % create : (T) -> (\tyExist(v,T)) when ...?
+% unpack!
 
 \chapter{Pointers}
 % store: (T, ptr(pad(void, T))) -> ptr(T)
