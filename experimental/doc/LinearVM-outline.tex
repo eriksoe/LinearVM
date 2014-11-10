@@ -257,11 +257,7 @@ return values as sum types whenever a function may generate an exception.)
 Interestingly, with the inclusion of multiple function exits, certain
 common machine instructions lose their special status: branching instructions
 can be replaced with functions. This has implications for the
-simplicity of the instruction set, as described in the next section.
-
-\section{Register machine}
-% TODO
-
+simplicity of the instruction set, as described in the chapter on architecture.
 
 \section{Borrowing}
 \label{sec:design-borrowing}
@@ -357,6 +353,71 @@ follows the call stack. In other cases, and when the borrowings are
 put in data structures off the stack, regular ``full'' borrowing must be used.
 In both cases, though, the same underlying mechanism is used, as far
 as the type system is concerned.
+
+\chapter{Virtual machine architecture}
+
+\section{Registers}
+The LinearVM virtual machine has a register-based architecture.
+There is a conceptually unlimited number of registers, and each
+register can hold a value of any type.
+
+The virtual machine uses register frames, which means that each
+function gets a fresh set of registers (they correspond to local
+variables) and does not have to save registers for its caller or callees.
+
+\section{Instruction set}
+To a certain extent, the interesting thing is not so much the
+concrete operations which the VM provides, as the type safety that it
+provides.
+Therefore, the design weighs the importantance of general mechanisms
+over specific data types and operations.
+
+\smallskip
+One concrete way in which this is done, is to take following quote:
+\begin{quote}
+Static methods are a great way to add opcodes.\\
+\raggedleft
+-- James Gosling
+\end{quote}
+to an extreme: only leave opcodes which can't be made into functions.
+This is advantageous in terms of byte-code verifier simplicity, since
+the verifier does not need to incorporate information about the
+existence and signatures of these operations.
+The focus of the instruction set is to describe data and control flow.
+
+Operations which can be made into function are relegated to the
+standard library. This includes all arithmetic and conversion
+operations, of course, but far more than that.
+
+Even operations with multiple outputs, such as product-type deconstruction,
+can be made into functions, if functions are allowed to have multiple
+return values.
+
+And even operations with multiple continuations/outcomes, such as
+sum-type deconstruction, can be made into functions, if functions are
+allowed to have multiple exits -- which they are.
+(Two-way branches based on boolean values are a special case of this,
+since the boolean type is a simple sum type.)
+
+\smallskip
+What remains, then, is:
+\begin{itemize}\def\itemsep{0pt}
+\item A function call instruction -- more powerful, perhaps, than is
+  usually seen, as it must handle both multiple inputs, multiple
+  exits, and multiple return values for each exit.
+\item A return instruction -- which can return multiple values to one
+  of possibly several exits.
+\item A constant loading instruction.
+\item An instruction labelling mechanism.
+\end{itemize}
+
+
+
+% Minimal instruction set
+% - MFEs make branching instructions non-basic/functionalizable.
+% Registers: contain any type (of known type)
+% TODO
+
 
 \part{Type System}
 
