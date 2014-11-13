@@ -19,7 +19,8 @@ struct
                 | VTABLE of (Name * Type) list (* TODO: Inheritance? *)
                             ;
 
-  datatype Decl = TYPEDEF of Name * Type
+  datatype Decl = MODULEDEF of FullName
+                | TYPEDEF of Name * Type
   type AST = Decl list
 end
 
