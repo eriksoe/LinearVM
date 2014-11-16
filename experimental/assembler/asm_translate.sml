@@ -75,8 +75,12 @@ fun convert_type(A0.NAMED_TYPE tname, env:TypeEnv) =
   | convert_type(A0.POINTER tbody, env) =
     A1.POINTER(convert_type(tbody,env))
   | convert_type(A0.VTABLE fs, env) =
-    A1.VTABLE(map (fn (n,t) => (n,convert_type(t,env))) fs)
-
+    A1.VTABLE(map (fn (n,s) => (n,convert_signature(s,env))) fs)
+and convert_typelist(ts,env) = map (fn t => convert_type(t,env)) ts
+and convert_signature((inputs, exits):A0.Signature, env:TypeEnv) =
+    (convert_typelist(inputs, env),
+     map (fn (exit_name,outputs) => (exit_name, convert_typelist(outputs,env)))
+     exits)
 
 
 end (* structure AsmTranslate *)

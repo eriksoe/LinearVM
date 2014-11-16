@@ -14,6 +14,9 @@ sig
     val tokenize_file   : string * ('a,'b) consumer -> 'b
 
     val accumulator_consumer : (postoken list, postoken list) consumer
+
+    val pos2str : position -> string
+
 end;
 
 structure Tokenizer : TOKENIZER =
@@ -153,6 +156,9 @@ struct
       = {initState=[],
          step=fn(s,t)=>t::s,
          finalize=rev}
+
+    fun pos2str(line,col) =
+        Int.toString line^":"^Int.toString col
 
 end
 

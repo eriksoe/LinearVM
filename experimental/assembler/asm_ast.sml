@@ -16,11 +16,14 @@ struct
                 | BLESS of Tag * Type
                 | CURSE of Tag * Type
                 | POINTER of Type
-                | VTABLE of (Name * Type) list (* TODO: Inheritance? *)
-                            ;
+                | VTABLE of (Name * Signature) list (* TODO: Inheritance? *)
+                | BORROW of Type                    (* at later levels, only allowed on top level. *)
+       withtype Signature = Type list * (string option * Type list) list
 
   datatype Decl = MODULEDEF of FullName
                 | TYPEDEF of Name * Type
+                | TYPEIMPORT of {name:FullName, arity:int, alias: Name option, actual_type: Type option}
+                | FUNCIMPORT of {name:FullName, signa:Signature}
   type AST = Decl list
 end
 
@@ -44,8 +47,9 @@ struct
                 | BLESS of Tag * Type
                 | CURSE of Tag * Type
                 | POINTER of Type
-                | VTABLE of (Name * Type) list (* TODO: Inheritance? *)
+                | VTABLE of (Name * Signature) list (* TODO: Inheritance? *)
 (* TODO: mutually recursive types. *)
+  withtype Signature = Type list * (string option * Type list) list
 ;
 
   datatype Decl = TYPEDEF of Name * Type
