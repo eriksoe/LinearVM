@@ -86,7 +86,7 @@ Recursive data types also use type variables.
 For instance, a cons list of \texttt{int32}s must be defined as a recursive type,
 which can be done like this:
 $$
-int32list := rec(T, variant\{nil:void, cons:record\{head:\mathtt{int32}, tail:ptr(T)\}\}
+int32list := rec(T:variant\{nil:void, cons:record\{head:\mathtt{int32}, tail:ptr(T)\}\})
 $$
 Note that this definition uses a pointer at the point of
 recursion. This is necessary for the type to have a finite size. More
@@ -112,7 +112,7 @@ To overcome this limitation, we have \emph{borrowing} -- types which
 specify that this is not an owning reference, but merely borrowing
 with the obligation to return the value again (release the borrowing),
 while being ensured that the real owner is not allowed to do
-modifications to the value such as disposing of it) while it is lend
+modifications to the value such as disposing of it) while it is lent
 out.
 
 % TODO: shared vs. exclusive; stack-to-stack borrowing vs. general case.
@@ -140,7 +140,8 @@ These properties are described briefly here and defined formally later,
 as we encounter the type constructors.
 
 \subsection{Arity}
-Higher-order types are supported. To each type is therefore associated
+Higher-order types (parametric polymorphism) is supported.
+To each type is therefore associated
 an \emph{arity} property which tells the depth of its free variables.
 $$
 \arity(T) : int
@@ -266,7 +267,7 @@ $$
 \tyCurse(n,a,t) := t
 $$
 
-$$\fixedsize(t) \over \tyCurse(n,a,t)$$
+$$\fixedsize(t) \over \fixedsize(\tyCurse(n,a,t))$$
 
 \subsubsection{Blessing}
 \emph{Blessing} is a subtyping mechanism.
@@ -294,11 +295,14 @@ $$\fixedsize(t) \over \fixedsize(\tyBless(n,a,t))$$
 \subsection{Pointers}
 The purpose of pointer types is to represent data structures of variable length
 in a fixed-size field.
-Pointers have no ``null''-like value. Pointer types should in practise
-always be used in association with a specification of a memory management
-policy.
+Pointers have no ``null''-like value.
 
-$$\it type ::= \tyPtr(type : type)$$
+Pointer types are parameterized with not only the type of the
+pointed-to value, but also with a \emph{pointer flavour}, which is
+more or less the same as a memory management policy (and which is
+represented by a type).
+
+$$\it type ::= \tyPtr(flavour: type, type : type)$$
 
 \subsubsection*{Properties}
 $$ \arity(\tyPtr(t)) = \arity(t)$$
