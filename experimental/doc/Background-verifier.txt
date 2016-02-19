@@ -1,0 +1,130 @@
+# Thinking doc.
+
+========== About the verifier and appropriate algorithms
+
+What job does the verifier have to do?
+
+- A type reconstruction job.
+- A proof reconstruction job.
+- A unification job.
+- A flow control join consistency checking job.
+
+How do we make the job easy/efficient for the verifier?
+
+- By making everything locally checkable.
+- By making the job syntax-directed.
+
+What makes the job harder?
+
+- Rules which make the job non-syntax-directed, such as the tagging
+  (bless/curse) rules.
+- Existential variables.
+- Flow control cycles.
+- The design decision balance of explicitness vs. compactness.
+
+What is the spectrum?
+
+- At one extreme end, we have given the existence witnesses and the
+  whole proof tree.
+- Next down, we have the full state type before each instruction.
+- Somewhere lower down, we have the full state type at each backward
+  branch target.
+- Yet lower, we have only the part of the state type which actually changes
+  during the loop.
+
+
+
+========== Representation during the verification process
+
+At the beginning of verification of a function:
+- The total arity (number of type parameters) of the function is determined -
+  as the max of the arities of the parameter & return types.
+- A number of token types are created, corresponding to the the total arity.
+  These constitutes the function's initial type context, at the
+  point before the first instruction.
+- In the type slots corresponding to `n` first registers, where `n` is
+  the number of parameters, are stored the corresponding types.
+
+- Now we come to the first instruction.
+  - Constant-load instructions: Check for emptiness of the target register;
+    store the constant's type in that slot.
+  - Return instructions: Check assignability from what's in the
+    registers to the types of the return types (of the function exit
+    in question), and check that there are no other non-ref registers.
+  - Labels: Ignore these for now. (Jumps get interesting; we will have
+    to look at it, but not now.)
+  - Function calls: These are the core of the matter.
+
+- Consider the called function's signature.
+  The left (input) side has zero or more type parameters (universally
+  quantified).
+  The right (output) sides each have zero or more further type
+  parameters (existentially quantified).
+
+- Type checking a function call essentially consists of unifying (by
+  assignability) the input types with the actual parameter types in
+  the present type context.
+
+- If successful:
+  - the universally quantified parameters are bound;
+  - for each function exit, the existentially quantified variables spring into being;
+  - the output types, determined by this context, are stored in the
+    type slots corresponding to the output registers, giving the type state
+    for each function exit label (including the implicit label just
+    after the instruction).
+
+- All in all, this means that a type slot is inhabited by a type
+  built using the usual type constructors, as well as:
+  - A token type for each free type parameter in the function's signature;
+  - A token type for each free existentially quantified variable in
+    each function-call-instruction;
+  - (Something like) a token type for certain type variables: (label
+    number, register number, de Bruijn index) for handling
+    existentials correctly wrt. dataflow join (think SSA phi nodes).
+
+ - IDEA: Would it help to store the existential types themselves in
+   some pseudo-registers (internally/implicitly, in the verification phase)?
+   Would that ease flow graph handling?
+   In that model, free type variables would not refer to a type context, but to
+   type registers.
+
+#++ http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=4D91D75B418579F0AA1F84C7E5F75CF2?doi=10.1.1.125.8215&rep=rep1&type=pdf SafeTSA: Using the flow-control dominance graph to make verification easier.
+
+========== Flow graph handling
+
+There are at least the following issues which need attention regarding
+flow graph handling:
+
+- How to check that flow joins are well-typed?
+  (In particular, that existential types unify consistently across registers)
+- How to handle labels which are only targeted by backward jumps?
+  In particular, how to determine a suitable order in which to process
+  the program?
+- When proceeding past a label, how to ensure that the register type
+  slots do not have a more general type than it should have (i.e. more
+  general than the common bound of all the incoming edges)?
+
+As for back-jump-only labels: these are characterised by a) not being
+targeted by a forward jump, and b) always following a "goto"- or
+"return"-like instruction, from which execution does not continue
+within the instruction.
+These instructions essentially leave all registers (or at
+least one) with a "value" of type `never` (bottom type).
+
+If built-in functions exist in the `basic.never` namespace, of schema
+`invent : never -> 'a, 'b, 'c, ..., 'z` (any number of outputs of any
+types, any number of existential type varibles), then these functions
+can be used to re-populate all registers to suitable types, priming
+the type slot for a coming back-jump-only label.
+
+Using that mechanism, we can always assume that any label is entered
+by either fall-through, forward-jump, or both. In that case, the
+verifier can proceed linearly through the program, checking joins when
+the non-first reference to a label occurs.
+
+In order to ensure that what we proceed from a label with are type
+which are not too general, at flow joins (non-first uses of a label)
+we require not just unifiability but assignability from the new
+register type set to the type set already associated with the label.
+(Technically, we would only need to require this for back-jumps; for
+forward jumps we could use unifiability.)
