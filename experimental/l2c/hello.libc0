@@ -1,0 +1,70 @@
+$LINEARVM
+
+(hello.libc0
+Hello World program in token-based bytecode format.
+)
+
+$MODULE (========== Module header)
+2 (Name of module)
+
+$SYMBOLS (========== Symbol table)
+14 (Table size)
+  "demo"    (#1)
+  "hello"   (#2)
+  "basis"   (#3)
+  "int"     (#4)
+  "bytestring" (#5)
+  "stdio"   (#6)
+  "instream" (#7)
+  "outstream" (#8)
+  "ascii_to_string" (#9)
+  "copy"    (#10)
+  "destroy" (#11)
+  "print"   (#12)
+  "string"  (#13)
+  "print"   (#14 - Canonicalization test)
+
+$NAMES (========== Name table)
+11 (Table size)
+  0 1 (#1: demo)
+  1 2 (#2: demo::hello)
+  0 3 (#3: basis)
+  3 4 (#4: basis::int)
+  3 5 (#5: basis::bytestring)
+  1 13 (#6: demo::string)
+  1 6 (#7: demo::stdio)
+  7 7 (#8 demo::stdio::instream)
+  7 8 (#9: demo::stdio::outstream)
+  1 6 (#10: demo::stdio - Canonicalization test)
+  10 7 (#11 demo::stdio::instream - Canonicalization test)
+
+$IMPORTEDTYPES (========== Type import table)
+5 (Table size)
+  4 0 (basis::int/0)
+  5 0 (basis::bytestring/0, bytestring)
+  6 0 (demo::string/0, string)
+  8 0 (demo::stdio::instream/0, instream)
+  9 0 (demo::stdio::outstream/0, outstream)
+(
+import_type{basis::int/0}.
+import_type{basis::bytestring/0, bytestring}.
+import_type{demo::string/0, string}.
+import_type{demo::stdio::instream/0, instream}.
+import_type{demo::stdio::outstream/0, outstream}.
+)
+
+
+(
+import_function{demo::ascii_to_string : [&bytestring] -> string ~> []}.
+import_function{demo::copy : [&string] -> string}.
+import_function{demo::destroy : [string] -> []}.
+import_function{demo::stdio::print : [&outstream, &string] -> []}.
+
+def_const_type{string, varlength{}, demo::ascii_to_string, demo::copy}.
+
+function{main : [in: &instream, out: &outstream] -> [],
+  [constant{string, "Hello, World!\n", r1},
+   call{demo::stdio::print, [out,r1], []},
+   call{demo::destroy, [r1], []},
+   return{[]}]}.
+)
